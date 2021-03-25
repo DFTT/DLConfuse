@@ -11,9 +11,6 @@
 
 
 
-
-
-
 // md5加密
 #import <CommonCrypto/CommonDigest.h>
 static NSString * MD5_32(NSString *originString) {
@@ -40,8 +37,7 @@ static NSString * MD5_32(NSString *originString) {
 {
     // 根目录
     NSString *_rootDirectoryPath;
-    // shuchu目录
-    NSString *_outDirectoryPath;
+    
     
     
     //.h / .m
@@ -56,7 +52,6 @@ static NSString * MD5_32(NSString *originString) {
     NSMutableSet<NSString *> *_hardStringSet;
     
     
-    
     // UI
     NSTextView *_messageView;
 }
@@ -69,9 +64,6 @@ static NSString * MD5_32(NSString *originString) {
     // init
     [self __reset];
     
-    
-    NSURL *path = [[[NSFileManager defaultManager] URLsForDirectory:NSDesktopDirectory inDomains:NSUserDomainMask] firstObject];
-    _outDirectoryPath = path.path;
     
     [self setupUI];
 }
@@ -96,7 +88,7 @@ static NSString * MD5_32(NSString *originString) {
     start.bezelStyle = NSBezelStyleRounded;
     [start setTitle:@"生成class混淆文件"];
     [start setTarget:self];
-    [start setAction:@selector(startBtnAction)];
+    [start setAction:@selector(confuseBtnAction)];
     [self.view addSubview:start];
     
     //
@@ -106,6 +98,16 @@ static NSString * MD5_32(NSString *originString) {
     [encryptBtn setTarget:self];
     [encryptBtn setAction:@selector(encryptBtnAction)];
     [self.view addSubview:encryptBtn];
+    
+    
+    //
+    NSButton *addPreBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 160, 100, 50)];
+    addPreBtn.bezelStyle = NSBezelStyleRounded;
+    [addPreBtn setTitle:@"批量增加前缀-bate"];
+    [addPreBtn setTarget:self];
+    [addPreBtn setAction:@selector(addPreBtnAction)];
+    [self.view addSubview:addPreBtn];
+    
     
     //
     NSScrollView *scrolleView = [[NSScrollView alloc] initWithFrame:CGRectMake(120, 10, 800, self.view.bounds.size.height - 10)];
@@ -151,52 +153,20 @@ static NSString * MD5_32(NSString *originString) {
         }
     }];
 }
-- (void)encryptBtnAction {
-    [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m)"];
-    
-    //
-    [self p_findVisiableFilePath:_rootDirectoryPath];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对文件",(int)_visiableFileArr.count]];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
-    
-    // 混淆 hard string
-    [self p_filterAndEncodeHardString];
-}
-- (void)startBtnAction {
-    [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m)"];
-    
-    //
-    [self p_findVisiableFilePath:_rootDirectoryPath];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对文件",(int)_visiableFileArr.count]];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
-    
-    
-    // 必须在.h .m文件中找到声明和实现 、 静态字符串
-    [self p_findClassName];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个className",(int)_classNameArr.count]];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个Hard String",(int)_hardStringSet.count]];
-    
-    // 过滤掉 声明为静态字符串的类名 && 过滤掉IBFile中包含的类名
-    NSArray<NSString *> *newArr = [self p_filter];
 
-    // 开始生成宏定义文件
-    [self p_creatFileWithArr:newArr];
-}
 
-//- (void)
 #pragma mark - 查找符合条件的文件
 - (void)p_findVisiableFilePath:(NSString *)rootPath {
+    [self p__findVisiableFilePath:rootPath needOnlyHFile:NO];
+}
+- (void)p__findVisiableFilePath:(NSString *)rootPath needOnlyHFile:(BOOL)needOnlyH {
     
     if (rootPath.length == 0) {
         return;
     }
     
     NSFileManager *fileM = [NSFileManager defaultManager];
-    
-    
     NSError       *err        = nil;
-    NSMutableSet *subhFileArr = [[NSMutableSet alloc] init];
-    NSMutableSet *submFileArr = [[NSMutableSet alloc] init];
     
     NSArray<NSString *> *contents = [fileM contentsOfDirectoryAtPath:rootPath error:&err];
     if (err) {
@@ -204,7 +174,10 @@ static NSString * MD5_32(NSString *originString) {
         return;
     }
     //
+    NSMutableSet *subhFileArr = [[NSMutableSet alloc] init];
+    NSMutableSet *submFileArr = [[NSMutableSet alloc] init];
     NSMutableArray *subDirectoryABSPathArr = [[NSMutableArray alloc] init];
+    
     for (NSString *subpath in contents) {
         
         NSString *absPath = [rootPath stringByAppendingPathComponent:subpath];
@@ -243,6 +216,8 @@ static NSString * MD5_32(NSString *originString) {
             }
             continue;
         }
+        
+        NSLog(@"--%@", subpath);
     }
     for (NSString *h in subhFileArr) {
         NSString *temp = [h stringByReplacingOccurrencesOfString:@".h" withString:@".m"];
@@ -251,14 +226,104 @@ static NSString * MD5_32(NSString *originString) {
             item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
             item.parentDirectoryABSPath = rootPath;
             [_visiableFileArr addObject:item];
+        }else if(needOnlyH) {
+            FileItem *item              = [[FileItem alloc] init];
+            item.onlyHFile              = YES;
+            item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
+            item.parentDirectoryABSPath = rootPath;
+            [_visiableFileArr addObject:item];
+            NSLog(@"未配对文件: %@", h);
         }
     }
     for (NSString *absDir in subDirectoryABSPathArr) {
-        [self p_findVisiableFilePath:absDir];
+        [self p__findVisiableFilePath:absDir needOnlyHFile:needOnlyH];
+    }
+}
+#pragma mark - 批量增加前缀
+- (void)addPreBtnAction {
+    [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m)"];
+    [self p__findVisiableFilePath:_rootDirectoryPath needOnlyHFile:YES];
+
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对文件",(int)_visiableFileArr.count]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
+
+    [self modify];
+
+}
+- (void)modify {
+    NSString *preStr = @"XM_";
+    
+    NSMutableArray *reanmeInfo = [NSMutableArray array];
+    //
+    for (FileItem *item in _visiableFileArr) {
+        if (item.onlyHFile == YES) {
+            // 这个情况要在考虑
+            continue;;
+        }
+        if ([item.fileName containsString:@"+"]) {
+            // 这个情况也要在考虑
+            continue;
+        }
+        
+        NSString *oldFileName = item.fileName;
+        if ([oldFileName hasPrefix:preStr]) {
+            continue;
+        }
+        NSString *newFileName = [preStr stringByAppendingString:oldFileName];
+        
+        NSString *fileContent = nil;
+        for (FileItem *item2 in _visiableFileArr) {
+            // h
+            fileContent = [[NSString alloc] initWithContentsOfFile:item2.abs_h_FilePath encoding:NSUTF8StringEncoding error:nil];
+            fileContent = [fileContent stringByReplacingOccurrencesOfString:oldFileName withString:newFileName];
+            [fileContent writeToFile:item2.abs_h_FilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            // m
+            fileContent = [[NSString alloc] initWithContentsOfFile:item2.abs_m_FilePath encoding:NSUTF8StringEncoding error:nil];
+            fileContent = [fileContent stringByReplacingOccurrencesOfString:oldFileName withString:newFileName];
+            [fileContent writeToFile:item2.abs_m_FilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        }
+        
+        [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", newFileName]],
+                                @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", oldFileName]],
+        }];
+        [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", newFileName]],
+                                @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", oldFileName]],
+        }];
+    }
+    
+    NSFileManager *film = [NSFileManager defaultManager];
+    for (NSDictionary *dic in reanmeInfo) {
+        NSString *new = dic[@"new"];
+        NSString *old = dic[@"old"];
+        if (NO == [film moveItemAtPath:old toPath:new error:nil]) {
+            NSLog(@"rename error -----");
+        }
     }
 }
 
-#pragma mark - 查找类名
+#pragma mark - 宏定义class混淆
+- (void)confuseBtnAction {
+    [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m)"];
+    
+    //
+    [self p_findVisiableFilePath:_rootDirectoryPath];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对文件",(int)_visiableFileArr.count]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
+    
+    
+    // 必须在.h .m文件中找到声明和实现 、 静态字符串
+    [self p_findClassName];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个className",(int)_classNameArr.count]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个Hard String",(int)_hardStringSet.count]];
+    
+    // 过滤掉 声明为静态字符串的类名 && 过滤掉IBFile中包含的类名
+    NSArray<NSString *> *newArr = [self p_filter];
+
+    // 开始生成宏定义文件
+    [self p_creatFileWithArr:newArr];
+}
+
+// 查找类名
 - (void)p_findClassName {
     
     NSRegularExpression *regExp = [NSRegularExpression regularExpressionWithPattern:@"@\".+?\"" options:NSRegularExpressionCaseInsensitive error:nil];
@@ -336,7 +401,9 @@ static NSString * MD5_32(NSString *originString) {
         }
     }
 }
-#pragma mark - 开始过滤
+
+
+// 开始过滤
 - (NSArray<NSString *> *)p_filter {
     
     NSMutableString *IBContent = [[NSMutableString alloc] init];
@@ -365,8 +432,7 @@ static NSString * MD5_32(NSString *originString) {
     }
     return newClassArr;
 }
-
-#pragma mark - creat file
+// creat file
 - (void)p_creatFileWithArr:(NSArray<NSString *> *)arr {
     // start obfuscator
     NSMutableString *result = [[NSMutableString alloc] init];
@@ -383,7 +449,9 @@ static NSString * MD5_32(NSString *originString) {
     // update headerFile
     NSData *data      = [NSData dataWithBytes:result.UTF8String length:result.length];
 
-    NSString *outPath = [_outDirectoryPath stringByAppendingPathComponent:@"DLConfuse.h"];
+    
+    NSURL *path = [[[NSFileManager defaultManager] URLsForDirectory:NSDesktopDirectory inDomains:NSUserDomainMask] firstObject];
+    NSString *outPath = [path.path stringByAppendingPathComponent:@"DLConfuse.h"];
     BOOL flag         = [data writeToFile:outPath atomically:YES];
     NSLog(@"--写入结果-%d",flag);
     if (flag) {
@@ -391,7 +459,19 @@ static NSString * MD5_32(NSString *originString) {
     }
 }
 
-#pragma mark - 加密 hard string <金币,现金,钱,赚,红包,提现,任务>
+#pragma mark - 混淆标记的字符串
+- (void)encryptBtnAction {
+    [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m)"];
+    
+    //
+    [self p_findVisiableFilePath:_rootDirectoryPath];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对文件",(int)_visiableFileArr.count]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
+    
+    // 混淆 hard string
+    [self p_filterAndEncodeHardString];
+}
+// 加密 hard string <金币,现金,钱,赚,红包,提现,任务>
 - (void)p_filterAndEncodeHardString {
     
     NSRegularExpression *regExp = [NSRegularExpression regularExpressionWithPattern:@"FlAG_ENCODE_STRING\\(.+?\\)" options:NSRegularExpressionCaseInsensitive error:nil];

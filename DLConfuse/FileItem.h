@@ -15,6 +15,10 @@
 @property (nonatomic, copy) NSString *fileName;              // 没后缀
 @property (nonatomic, copy) NSString *parentDirectoryABSPath;// 父目录
 
+// 同目录没有对应m文件
+@property (nonatomic, assign) BOOL onlyHFile;
+
+
 // .h
 - (NSString *)abs_h_FilePath;
 // .m
