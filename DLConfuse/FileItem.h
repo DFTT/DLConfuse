@@ -18,12 +18,13 @@
 // 同目录没有对应m文件
 @property (nonatomic, assign) BOOL onlyHFile;
 
-
+@property (nonatomic, assign) BOOL isSwift;
 // .h
 - (NSString *)abs_h_FilePath;
 // .m
 - (NSString *)abs_m_FilePath;
-
+// .swift
+- (NSString *)abs_swift_FilePath;
 @end
 
 

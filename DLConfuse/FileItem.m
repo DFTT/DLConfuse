@@ -23,4 +23,8 @@
 - (NSString *)abs_m_FilePath {
     return [_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", _fileName]];
 }
+
+- (NSString *)abs_swift_FilePath {
+    return [_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", _fileName]];
+}
 @end
