@@ -15,6 +15,8 @@
 		5B4A6A0F2244CBD300459F2C /* DLConfuseTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4A6A0E2244CBD300459F2C /* DLConfuseTests.m */; };
 		5B4A6A1A2244CBD300459F2C /* DLConfuseUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4A6A192244CBD300459F2C /* DLConfuseUITests.m */; };
 		5B4A6A2D2248D4D900459F2C /* FileItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4A6A2C2248D4D900459F2C /* FileItem.m */; };
+		5BBD46AC2816BFAA0013DEB0 /* TestOC.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BBD46AB2816BFAA0013DEB0 /* TestOC.m */; };
+		5BC0C71626B8491C008F310F /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC0C71526B8491C008F310F /* Test.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +55,10 @@
 		5B4A6A1B2244CBD300459F2C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5B4A6A2B2248D4D900459F2C /* FileItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FileItem.h; sourceTree = "<group>"; };
 		5B4A6A2C2248D4D900459F2C /* FileItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FileItem.m; sourceTree = "<group>"; };
+		5BBD46AA2816BFAA0013DEB0 /* TestOC.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestOC.h; sourceTree = "<group>"; };
+		5BBD46AB2816BFAA0013DEB0 /* TestOC.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestOC.m; sourceTree = "<group>"; };
+		5BC0C71226B847D9008F310F /* DLConfuse-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "DLConfuse-Bridging-Header.h"; sourceTree = "<group>"; };
+		5BC0C71526B8491C008F310F /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +89,7 @@
 		5B4A69EB2244CBD100459F2C = {
 			isa = PBXGroup;
 			children = (
+				5BBD46A92816BF730013DEB0 /* TestCode */,
 				5B4A69F62244CBD100459F2C /* DLConfuse */,
 				5B4A6A0D2244CBD300459F2C /* DLConfuseTests */,
 				5B4A6A182244CBD300459F2C /* DLConfuseUITests */,
@@ -114,6 +121,7 @@
 				5B4A6A022244CBD300459F2C /* Info.plist */,
 				5B4A6A032244CBD300459F2C /* main.m */,
 				5B4A6A052244CBD300459F2C /* DLConfuse.entitlements */,
+				5BC0C71226B847D9008F310F /* DLConfuse-Bridging-Header.h */,
 			);
 			path = DLConfuse;
 			sourceTree = "<group>";
@@ -134,6 +142,16 @@
 				5B4A6A1B2244CBD300459F2C /* Info.plist */,
 			);
 			path = DLConfuseUITests;
+			sourceTree = "<group>";
+		};
+		5BBD46A92816BF730013DEB0 /* TestCode */ = {
+			isa = PBXGroup;
+			children = (
+				5BC0C71526B8491C008F310F /* Test.swift */,
+				5BBD46AA2816BFAA0013DEB0 /* TestOC.h */,
+				5BBD46AB2816BFAA0013DEB0 /* TestOC.m */,
+			);
+			path = TestCode;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -203,6 +221,7 @@
 				TargetAttributes = {
 					5B4A69F32244CBD100459F2C = {
 						CreatedOnToolsVersion = 10.1;
+						LastSwiftMigration = 1250;
 						SystemCapabilities = {
 							com.apple.Sandbox = {
 								enabled = 0;
@@ -273,7 +292,9 @@
 				5B4A6A2D2248D4D900459F2C /* FileItem.m in Sources */,
 				5B4A69FC2244CBD100459F2C /* ViewController.m in Sources */,
 				5B4A6A042244CBD300459F2C /* main.m in Sources */,
+				5BC0C71626B8491C008F310F /* Test.swift in Sources */,
 				5B4A69F92244CBD100459F2C /* AppDelegate.m in Sources */,
+				5BBD46AC2816BFAA0013DEB0 /* TestOC.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -435,9 +456,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = D83JHSRAX2;
+				DEVELOPMENT_TEAM = SA82S27SRM;
 				INFOPLIST_FILE = DLConfuse/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -446,6 +468,9 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dadadongl.DLConfuse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "DLConfuse/DLConfuse-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -453,6 +478,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = D83JHSRAX2;
@@ -464,12 +490,15 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dadadongl.DLConfuse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "DLConfuse/DLConfuse-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
 		5B4A6A222244CBD300459F2C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -489,6 +518,7 @@
 		5B4A6A232244CBD300459F2C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -508,6 +538,7 @@
 		5B4A6A252244CBD300459F2C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = SA82S27SRM;
@@ -526,6 +557,7 @@
 		5B4A6A262244CBD300459F2C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = SA82S27SRM;

@@ -104,21 +104,21 @@ static NSString * MD5_32(NSString *originString) {
     
     
     //
-    NSButton *addPreBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 160, 100, 50)];
+    NSButton *addPreBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 160, 170, 50)];
     addPreBtn.bezelStyle = NSBezelStyleRounded;
-    [addPreBtn setTitle:@"批量增加前缀-bate"];
+    [addPreBtn setTitle:@"代码文件批量增加前缀Beta"];
     [addPreBtn setTarget:self];
     [addPreBtn setAction:@selector(addPreBtnAction)];
     [self.view addSubview:addPreBtn];
     
     
     //
-    NSScrollView *scrolleView = [[NSScrollView alloc] initWithFrame:CGRectMake(120, 10, 800, self.view.bounds.size.height - 10)];
+    NSScrollView *scrolleView = [[NSScrollView alloc] initWithFrame:CGRectMake(180, 10, 800, self.view.bounds.size.height - 10)];
     [scrolleView setHasVerticalScroller:YES];
     [scrolleView setHasHorizontalScroller:NO];
     [self.view addSubview:scrolleView];
     //
-    NSTextView *textView = [[NSTextView alloc] initWithFrame:CGRectMake(120, 10, 800, self.view.bounds.size.height - 10)];
+    NSTextView *textView = [[NSTextView alloc] initWithFrame:CGRectMake(150, 10, 800, self.view.bounds.size.height - 10)];
     textView.editable    = NO;
     textView.string      = @"欢迎使用 ~~！ \n\n";
     [scrolleView setDocumentView:textView];
@@ -184,7 +184,8 @@ static NSString * MD5_32(NSString *originString) {
     for (NSString *subpath in contents) {
         
         NSString *absPath = [rootPath stringByAppendingPathComponent:subpath];
-        if ([fileM isReadableFileAtPath:absPath] == NO) {
+        if ([fileM isWritableFileAtPath:absPath] == NO) {
+            // 不能修改的跳过
             continue;
         }
        
@@ -223,34 +224,41 @@ static NSString * MD5_32(NSString *originString) {
             if (subpath.pathExtension.length == 0) {
                 [subDirectoryABSPathArr addObject:absPath];
             }else {
-                NSLog(@"过滤文件目录 : %@", subpath);
+                NSLog(@"过滤有后缀的文件夹 : %@", subpath);
             }
             continue;
         }
         
-        NSLog(@"--%@", subpath);
+        NSLog(@"跳过的文件-- %@", subpath);
     }
+    // 判断是否两个文件都在
     for (NSString *h in subhFileArr) {
         NSString *temp = [h stringByReplacingOccurrencesOfString:@".h" withString:@".m"];
         if ([submFileArr containsObject:temp]) {
+            //.h .m同时存在
             FileItem *item              = [[FileItem alloc] init];
             item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
             item.parentDirectoryABSPath = rootPath;
             [_visiableFileArr addObject:item];
-        }else if(needOnlyH) {
-            FileItem *item              = [[FileItem alloc] init];
-            item.onlyHFile              = YES;
-            item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
-            item.parentDirectoryABSPath = rootPath;
-            [_visiableFileArr addObject:item];
+        }else {
+            // 只有.h
             NSLog(@"未配对文件: %@", h);
+            
+            if(needOnlyH) {
+                FileItem *item              = [[FileItem alloc] init];
+                item.onlyHFile              = YES;
+                item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
+                item.parentDirectoryABSPath = rootPath;
+                [_visiableFileArr addObject:item];
+            }
         }
     }
+    // 递归子路径
     for (NSString *absDir in subDirectoryABSPathArr) {
         [self p__findVisiableFilePath:absDir needOnlyHFile:needOnlyH];
     }
 }
-#pragma mark - 批量增加前缀
+#pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
     [self p__findVisiableFilePath:_rootDirectoryPath needOnlyHFile:YES];
@@ -259,10 +267,10 @@ static NSString * MD5_32(NSString *originString) {
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
     
     [self modify];
-
 }
 - (void)modify {
-    NSString *preStr = @"XM_";
+    NSString *oldPre = @"TS";
+    NSString *newPre = @"QT";
     
     NSMutableArray *reanmeInfo = [NSMutableArray array];
     //
@@ -272,16 +280,19 @@ static NSString * MD5_32(NSString *originString) {
             continue;;
         }
         if ([item.fileName containsString:@"+"]) {
-            // 这个情况也要在考虑
+            // 扩展 这个情况也要在考虑
             continue;
         }
         
         NSString *oldFileName = item.fileName;
-        if ([oldFileName hasPrefix:preStr]) {
+        if (NO == [oldFileName hasPrefix:oldPre]) {
+            // 只有符合条件的 才修改
             continue;
         }
-        NSString *newFileName = [preStr stringByAppendingString:oldFileName];
         
+        NSString *newFileName = [oldFileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+        
+        // 改一遍头文件导入名
         NSString *fileContent = nil;
         for (FileItem *item2 in _visiableFileArr) {
             // h
@@ -293,7 +304,7 @@ static NSString * MD5_32(NSString *originString) {
             fileContent = [fileContent stringByReplacingOccurrencesOfString:oldFileName withString:newFileName];
             [fileContent writeToFile:item2.abs_m_FilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
         }
-        
+        // 记录
         [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", newFileName]],
                                 @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", oldFileName]],
         }];
@@ -309,17 +320,11 @@ static NSString * MD5_32(NSString *originString) {
         }
         
         NSString *oldFileName = item.fileName;
-        if ([oldFileName hasPrefix:preStr]) {
+        if (NO == [oldFileName hasPrefix:oldPre]) {
             continue;
         }
-        NSString *newFileName = [preStr stringByAppendingString:oldFileName];
-        
-        NSString *fileContent = nil;
-        // h
-        fileContent = [[NSString alloc] initWithContentsOfFile:item.abs_swift_FilePath encoding:NSUTF8StringEncoding error:nil];
-        fileContent = [fileContent stringByReplacingOccurrencesOfString:oldFileName withString:newFileName];
-        [fileContent writeToFile:item.abs_swift_FilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        
+        NSString *newFileName = [oldFileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+        // swift
         [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", newFileName]],
                                 @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", oldFileName]],
         }];
@@ -435,54 +440,54 @@ static NSString * MD5_32(NSString *originString) {
             }
         }
     }
-    
-    for (FileItem *item in _swiftFileArr) {
-        // 过滤扩展
-        if ([item.fileName containsString:@"+"]) {
-            continue;
-        }
-        // .swift
-        NSMutableSet *swift_class = [[NSMutableSet alloc] init];
-        NSError *err         = nil;
-        NSString *path       = [item abs_swift_FilePath];
-        NSString *fileCntent = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
-        if (!fileCntent || err) {
-            NSLog(@"file read failure : %@", err);
-            continue;
-        }
-        // 寻找静态字符串
-        NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:fileCntent options:0 range:NSMakeRange(0, fileCntent.length)];
-        for (NSTextCheckingResult *result in matchs) {
-            [_hardStringSet addObject:[fileCntent substringWithRange:result.range]];
-        }
-        
-        // 按行找className
-        NSArray *lines = [fileCntent componentsSeparatedByString:@"\n"];
-        if (lines.count == 0) {
-            NSLog(@"file content number == 0");
-            continue;
-        }
-        for (NSString *lineString in lines) {
-            NSArray *temparr = [lineString componentsSeparatedByString:@"class"];
-            if (temparr.count <= 1) {
-                continue;
-            }
-            temparr = [[temparr lastObject] componentsSeparatedByString:@":"];
-            if (temparr.count <= 1) {
-                continue;
-            }
-            NSString *classN = [[temparr firstObject] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-            if (!classN || classN.length == 0) {
-                continue;
-            }
-            [swift_class addObject:classN];
-        }
-        
-        // 过滤
-        for (NSString *swift in swift_class.allObjects) {
-            [_classNameArr addObject:swift];
-        }
-    }
+    // 宏定义对Swift Class 应该无效的吧 所以先注释掉 (猜的 没验证)
+//    for (FileItem *item in _swiftFileArr) {
+//        // 过滤扩展
+//        if ([item.fileName containsString:@"+"]) {
+//            continue;
+//        }
+//        // .swift
+//        NSMutableSet *swift_class = [[NSMutableSet alloc] init];
+//        NSError *err         = nil;
+//        NSString *path       = [item abs_swift_FilePath];
+//        NSString *fileCntent = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
+//        if (!fileCntent || err) {
+//            NSLog(@"file read failure : %@", err);
+//            continue;
+//        }
+//        // 寻找静态字符串
+//        NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:fileCntent options:0 range:NSMakeRange(0, fileCntent.length)];
+//        for (NSTextCheckingResult *result in matchs) {
+//            [_hardStringSet addObject:[fileCntent substringWithRange:result.range]];
+//        }
+//
+//        // 按行找className
+//        NSArray *lines = [fileCntent componentsSeparatedByString:@"\n"];
+//        if (lines.count == 0) {
+//            NSLog(@"file content number == 0");
+//            continue;
+//        }
+//        for (NSString *lineString in lines) {
+//            NSArray *temparr = [lineString componentsSeparatedByString:@"class"];
+//            if (temparr.count <= 1) {
+//                continue;
+//            }
+//            temparr = [[temparr lastObject] componentsSeparatedByString:@":"];
+//            if (temparr.count <= 1) {
+//                continue;
+//            }
+//            NSString *classN = [[temparr firstObject] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+//            if (!classN || classN.length == 0) {
+//                continue;
+//            }
+//            [swift_class addObject:classN];
+//        }
+//
+//        // 过滤
+//        for (NSString *swift in swift_class.allObjects) {
+//            [_classNameArr addObject:swift];
+//        }
+//    }
 }
 
 
@@ -558,7 +563,7 @@ static NSString * MD5_32(NSString *originString) {
 - (void)p_filterAndEncodeHardString {
     for (FileItem *item in _visiableFileArr) {
         for (int i = 0; i<2; i++) {
-            NSString *path       = i == 0 ? [item abs_h_FilePath] : [item abs_m_FilePath];
+            NSString *path = i == 0 ? [item abs_h_FilePath] : [item abs_m_FilePath];
             [self hardString:item path:path ];
         }
     }
@@ -599,6 +604,9 @@ static NSString * MD5_32(NSString *originString) {
                 matchSubContent = [matchSubContent substringWithRange:NSMakeRange(2, matchSubContent.length - 3)];
             }
             
+            if (matchSubContent.length == 0) {
+                continue;
+            }
             // 混淆编码
             NSMutableString *mTmp = [[[matchSubContent dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0] mutableCopy];
             for (NSString *ch_ar in char_Arr) {

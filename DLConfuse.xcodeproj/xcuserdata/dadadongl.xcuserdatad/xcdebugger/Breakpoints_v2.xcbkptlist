@@ -1,22 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Bucket
-   uuid = "6B867883-2C84-4AD1-8CBF-493382B40648"
+   uuid = "451B0C39-C46D-48CA-9811-8569650D4CB6"
    type = "1"
    version = "2.0">
    <Breakpoints>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "AF76D77C-85A0-4AD6-B9C6-A3F2EC0520ED"
+            uuid = "A5396690-332B-4EE5-A57D-7508F2E9FACD"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "DLConfuse/ViewController.m"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "251"
-            endingLineNumber = "251"
-            landmarkName = "-addPreBtnAction"
+            startingLineNumber = "635"
+            endingLineNumber = "635"
+            landmarkName = "unknown"
+            landmarkType = "0">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "C185BDC7-B6D2-42DB-9855-922B27B16822"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "DLConfuse/ViewController.m"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "617"
+            endingLineNumber = "617"
+            landmarkName = "-hardString:path:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "907A93D4-05AA-44F1-A166-54015130141E"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "DLConfuse/ViewController.m"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "621"
+            endingLineNumber = "621"
+            landmarkName = "-hardString:path:"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
