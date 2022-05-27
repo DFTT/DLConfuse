@@ -9,55 +9,32 @@
 #import "ViewController.h"
 #import "FileItem.h"
 
-
-
-// md5加密
-#import <CommonCrypto/CommonDigest.h>
-static NSString * MD5_32(NSString *originString) {
-    if (!originString || originString.length == 0) {
-        return @"";
-    }
-    const char* str = [originString UTF8String];
-    unsigned char result[CC_MD5_DIGEST_LENGTH];
-    CC_MD5(str, (CC_LONG)strlen(str), result);
-    
-    NSMutableString *ret = [NSMutableString stringWithCapacity:CC_MD5_DIGEST_LENGTH*2];//
-    for(int i = 0; i<CC_MD5_DIGEST_LENGTH; i++) {
-        [ret appendFormat:@"%02x",result[i]];
-    }
-    return ret;
-}
-
-
-
-
-
-
 @interface ViewController ()
 {
     // 根目录
     NSString *_rootDirectoryPath;
     
+    // .xcodeproj 完整路径
+    NSString *_xcodeprojPath;
+    // TODO: 排除目录数组
     
+    // .h .m .swift .pch
+    NSMutableArray<FileItem *> *_codeFileArr;
     
-    //.h / .m
-    NSMutableArray<FileItem *> *_visiableFileArr;
-    // .swift
-    NSMutableArray<FileItem *> *_swiftFileArr;
     // .xib  .stroryboare
     NSMutableArray<FileItem *> *_IBFileArr;
-    
-    
     
     // UI
     NSTextView *_messageView;
 }
 @end
+
+
 @implementation ViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-
+    
     // init
     [self __reset];
     
@@ -65,9 +42,8 @@ static NSString * MD5_32(NSString *originString) {
     [self setupUI];
 }
 - (void)__reset {
-    _visiableFileArr = [[NSMutableArray alloc] init];
-    _swiftFileArr    = [[NSMutableArray alloc] init];
-    _IBFileArr       = [[NSMutableArray alloc] init];
+    _codeFileArr = [[NSMutableArray alloc] init];
+    _IBFileArr = [[NSMutableArray alloc] init];
 }
 #pragma mark - UI
 - (void)setupUI {
@@ -105,9 +81,9 @@ static NSString * MD5_32(NSString *originString) {
     //
     NSTextView *textView = [[NSTextView alloc] initWithFrame:CGRectMake(150, 10, 800, self.view.bounds.size.height - 10)];
     textView.editable    = NO;
-    textView.string      = @"欢迎使用 ~~！ \n\n";
+    textView.string      = @"欢迎使用 ~~！ \n请一定要确保当前git工作区内容已提交, 便于工具修改错误时git回滚\n\n";
     [scrolleView setDocumentView:textView];
-   
+    
     _messageView = textView;
 }
 - (void)p_appendMessage:(NSString *)text {
@@ -117,11 +93,12 @@ static NSString * MD5_32(NSString *originString) {
     
     text = [text stringByAppendingString:@"\n\n"];
     NSAttributedString *attr = [[NSAttributedString alloc] initWithString:text];
-
+    
     
     [[_messageView textStorage] appendAttributedString:attr];
     [_messageView scrollRangeToVisible:NSMakeRange([[_messageView string] length], 0)];
 }
+
 #pragma mark - Action
 - (void)btnClickAction {
     NSOpenPanel *panel = [NSOpenPanel openPanel];
@@ -135,25 +112,39 @@ static NSString * MD5_32(NSString *originString) {
         if (result == NSModalResponseOK) {
             NSURL *document = [[panel URLs] objectAtIndex:0];
             
-            strongSelf->_rootDirectoryPath = document.path;
-            
-            [self p_appendMessage:[NSString stringWithFormat:@"---已选中目录:%@",document.path]];
+            if ([[[NSFileManager.defaultManager attributesOfItemAtPath:document.path error:nil] objectForKey:NSFileType] isEqualToString:NSFileTypeDirectory]) {
+                
+                strongSelf->_rootDirectoryPath = document.path;
+                [self p_appendMessage:[NSString stringWithFormat:@"---已选中目录:%@",document.path]];
+            }else {
+                [self p_appendMessage:[NSString stringWithFormat:@"---请选中一个目录:%@",document.path]];
+            }
         }
     }];
 }
 
-
 #pragma mark - 查找符合条件的文件
 
-- (void)p__findVisiableFilePath:(NSString *)rootPath needOnlyHFile:(BOOL)needOnlyH {
-    
+- (void)p__findVisiableFilePath:(NSString *)rootPath {
     if (rootPath.length == 0) {
         return;
     }
-    
     NSFileManager *fileM = [NSFileManager defaultManager];
-    NSError       *err        = nil;
     
+    BOOL isDirectiry = NO;
+    if (NO == [fileM fileExistsAtPath:rootPath isDirectory:&isDirectiry]) {
+        // 过滤 非目录
+        return;
+    }
+    if (isDirectiry && rootPath.pathExtension.length != 0) {
+        // 过滤 有后缀的目录
+        if (!_xcodeprojPath && [rootPath.pathExtension isEqualToString:@"xcodeproj"]) {
+            _xcodeprojPath = rootPath;
+        }
+        return;
+    }
+    
+    NSError *err = nil;
     NSArray<NSString *> *contents = [fileM contentsOfDirectoryAtPath:rootPath error:&err];
     if (err) {
         NSLog(@"contents error = %@", err);
@@ -171,7 +162,7 @@ static NSString * MD5_32(NSString *originString) {
             // 不能修改的跳过
             continue;
         }
-       
+        
         if ([subpath.pathExtension isEqualToString:@"h"]) {
             [subhFileArr addObject:subpath];
             continue;
@@ -180,152 +171,250 @@ static NSString * MD5_32(NSString *originString) {
             [submFileArr addObject:subpath];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"swift"] && ![subpath isEqualToString:@"Macros.swift"]) {
+        if ([subpath.pathExtension isEqualToString:@"swift"]) {
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = [subpath stringByReplacingOccurrencesOfString:@".swift" withString:@""];
+            item.fileName               = subpath.stringByDeletingPathExtension;
             item.parentDirectoryABSPath = rootPath;
-            item.isSwift                = YES;
-            [_swiftFileArr addObject:item];
+            item.type                = FileIsSwift;
+            [_codeFileArr addObject:item];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"xib"] || [subpath.pathExtension isEqualToString:@"storyboard"]) {
+        if ([subpath.pathExtension isEqualToString:@"pch"]) {
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = subpath;
+            item.fileName               = subpath.stringByDeletingPathExtension;
             item.parentDirectoryABSPath = rootPath;
+            item.type                = FileIsPCH;
+            [_codeFileArr addObject:item];
+            continue;
+        }
+        if ([subpath.pathExtension isEqualToString:@"xib"]) {
+            FileItem *item              = [[FileItem alloc] init];
+            item.fileName               = subpath.stringByDeletingPathExtension;
+            item.parentDirectoryABSPath = rootPath;
+            item.type                = FileIsXIB;
+            [_IBFileArr addObject:item];
+            continue;
+        }
+        if ([subpath.pathExtension isEqualToString:@"storyboard"]) {
+            FileItem *item              = [[FileItem alloc] init];
+            item.fileName               = subpath.stringByDeletingPathExtension;
+            item.parentDirectoryABSPath = rootPath;
+            item.type                = FileIsStoryBoard;
             [_IBFileArr addObject:item];
             continue;
         }
         
-        
         err = nil;
         NSDictionary *attr = [fileM attributesOfItemAtPath:absPath error:&err];
-        if (err) {
-            NSLog(@"attributes error = %@", err);
-            continue;
+        if (nil == err && [attr[NSFileType] isEqualToString:NSFileTypeDirectory]) {
+            // 没有后缀的子目录 后面继续递归
+            [subDirectoryABSPathArr addObject:absPath];
         }
-        if ([attr[NSFileType] isEqualToString:NSFileTypeDirectory]) {
-            if (subpath.pathExtension.length == 0) {
-                [subDirectoryABSPathArr addObject:absPath];
-            }else {
-                NSLog(@"过滤有后缀的文件夹 : %@", subpath);
-            }
-            continue;
-        }
-        
-        NSLog(@"跳过的文件-- %@", subpath);
     }
-    // 判断是否两个文件都在
-    for (NSString *h in subhFileArr) {
-        NSString *temp = [h stringByReplacingOccurrencesOfString:@".h" withString:@".m"];
-        if ([submFileArr containsObject:temp]) {
+    // 判断文件夹内.h/.m是否同时存在
+    [subhFileArr enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSString *h, BOOL * _Nonnull stop) {
+        NSString *tempM = [h stringByReplacingOccurrencesOfString:@".h" withString:@".m"];
+        if ([submFileArr containsObject:tempM]) {
             //.h .m同时存在
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
+            item.fileName               = h.stringByDeletingPathExtension;
             item.parentDirectoryABSPath = rootPath;
-            [_visiableFileArr addObject:item];
-        }else {
-            // 只有.h
-            NSLog(@"未配对文件: %@", h);
+            item.type = FileIsHAndM;
+            [_codeFileArr addObject:item];
             
-            if(needOnlyH) {
-                FileItem *item              = [[FileItem alloc] init];
-                item.onlyHFile              = YES;
-                item.fileName               = [h stringByReplacingOccurrencesOfString:@".h" withString:@""];
-                item.parentDirectoryABSPath = rootPath;
-                [_visiableFileArr addObject:item];
-            }
+            [submFileArr removeObject:tempM];
+            return;
         }
-    }
+        // 单独.h
+        FileItem *item              = [[FileItem alloc] init];
+        item.fileName               = h.stringByDeletingPathExtension;
+        item.parentDirectoryABSPath = rootPath;
+        item.type = FileIsOnlyH;
+        [_codeFileArr addObject:item];
+    }];
+    // 单独.m
+    [submFileArr enumerateObjectsUsingBlock:^(NSString *m, BOOL * _Nonnull stop) {
+        FileItem *item              = [[FileItem alloc] init];
+        item.fileName               = m.stringByDeletingPathExtension;
+        item.parentDirectoryABSPath = rootPath;
+        item.type = FileIsOnlyM;
+        [_codeFileArr addObject:item];
+    }];
+    
     // 递归子路径
     for (NSString *absDir in subDirectoryABSPathArr) {
-        [self p__findVisiableFilePath:absDir needOnlyHFile:needOnlyH];
+        [self p__findVisiableFilePath:absDir];
     }
 }
 #pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
-    [self p__findVisiableFilePath:_rootDirectoryPath needOnlyHFile:YES];
+    [self p__findVisiableFilePath:_rootDirectoryPath];
     
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m文件",(int)_visiableFileArr.count + (int)_swiftFileArr.count]];
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个.swift文件",(int)_swiftFileArr.count]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
+    
+    if (_xcodeprojPath.length <= 0) {
+        //
+        [self p_appendMessage:@"---未找到.xcodeproj, 请修改搜索目录, 或初始化时赋值"];
+        return;
+    }
     
     [self modify];
     
     [self p_appendMessage:@"前缀修改完成"];
 }
+
+- (BOOL)p_reguleChange:(NSMutableString *)mContent from:(NSString *)old to:(NSString *)new {
+    if (new.length <= 0 ) {
+        return NO;
+    }
+    old = [old stringByReplacingOccurrencesOfString:@"+" withString:@"\\+"];
+    old = [old stringByReplacingOccurrencesOfString:@"." withString:@"\\."];
+    NSString *pattern = [NSString stringWithFormat:@"\\b%@\\b", old];
+    NSError *err = nil;
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:NSRegularExpressionCaseInsensitive error:&err];
+    if (!regex || err) {
+        NSLog(@"正则表达式创建失败, 请检查 %@", err);
+        return NO;
+    }
+    NSArray<NSTextCheckingResult *> *matchRes = [regex matchesInString:mContent options:0 range:NSMakeRange(0, mContent.length)];
+    if (matchRes.count == 0) {
+        return NO;
+    }
+    for (NSInteger i = matchRes.count - 1; i >= 0; i--) {
+        NSTextCheckingResult *result = matchRes[i];
+        [mContent replaceCharactersInRange:result.range withString:new];
+    }
+    return YES;
+}
+
 - (void)modify {
     NSString *oldPre = @"BDD";
     NSString *newPre = @"DDL";
     
-    NSMutableArray *reanmeInfo = [NSMutableArray array];
-    //
-    for (FileItem *item in _visiableFileArr) {
-        if (item.onlyHFile == YES) {
-            // 这个情况要在考虑
-            continue;;
+    // 工程文件_xcodeprojPath/project.pbxproj 内容
+    NSString *pbxprojPath = [_xcodeprojPath stringByAppendingPathComponent:@"project.pbxproj"];
+    NSMutableString *pbxprojContentString = [[NSMutableString alloc] initWithContentsOfFile:pbxprojPath encoding:NSUTF8StringEncoding error:nil];
+    if (pbxprojContentString.length == 0) {
+        NSAssert(NO, @"project.pbxproj 读取失败");
+        return;
+    }
+    
+    // 筛选需要修改文件名的
+    NSMutableDictionary<NSString *, FileItem *> *nomalItemsMap = [NSMutableDictionary dictionaryWithCapacity:200];
+    for (FileItem *item in _codeFileArr) {
+        if ((item.type == FileIsHAndM || item.type == FileIsSwift) && ![item.fileName containsString:@"+"] && [item.fileName hasPrefix:oldPre]) {
+            // 非扩展 (后面应该同时考虑 同名的xib 扩展文件)
+            item.reFileName = [item.fileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+            nomalItemsMap[item.fileName] = item;
         }
-        if ([item.fileName containsString:@"+"]) {
-            // 扩展 这个情况也要在考虑
+    }
+    
+    // 需要修改文件名的category
+    NSMutableDictionary<NSString *, FileItem *> *categoryItemsMap = [NSMutableDictionary dictionaryWithCapacity:200];
+    // 寻找需要该名的扩展
+    for (FileItem *item in _codeFileArr) {
+        NSArray *halfFileNames = [item.fileName componentsSeparatedByString:@"+"];
+        if (halfFileNames.count == 2) {
+            NSString *pre = halfFileNames.firstObject;
+            NSString *suf = halfFileNames.lastObject;
+            
+            FileItem *hitItem = nomalItemsMap[pre];
+            if (hitItem) {
+                // 特殊 不需判断是否同时存在h/m (比如要改 aaa.swift, 这里找到 aaa+xxx.swift, aaa+xxx.h/m 后续都一起改掉)
+                if ([suf hasPrefix:oldPre]) {
+                    suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+                }
+                // 改名
+                item.reFileName = [NSString stringWithFormat:@"%@+%@", hitItem.reFileName, suf];
+                categoryItemsMap[item.fileName] = item;
+                continue;
+            }
+            
+            if (item.type == FileIsHAndM || item.type == FileIsSwift) {
+                // 普通
+                BOOL hit = NO;
+                if ([pre hasPrefix:oldPre]) {
+                    pre = [pre stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+                    hit = YES;
+                }
+                if ([suf hasPrefix:oldPre]) {
+                    suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+                    hit = YES;
+                }
+                if (hit) {
+                    // 改名
+                    item.reFileName = [NSString stringWithFormat:@"%@+%@", pre, suf];
+                    categoryItemsMap[item.fileName] = item;
+                    continue;
+                }
+            }
             continue;
         }
-        
-        NSString *oldFileName = item.fileName;
-        if (NO == [oldFileName hasPrefix:oldPre]) {
-            // 只有符合条件的 才修改
-            continue;
-        }
-        
-        NSString *newFileName = [oldFileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
-        
-        // 改一遍头文件导入名
-        NSString *fileContent = nil;
-        for (FileItem *item2 in _visiableFileArr) {
-            @autoreleasepool {
-                // h
-                fileContent = [[NSString alloc] initWithContentsOfFile:item2.abs_h_FilePath encoding:NSUTF8StringEncoding error:nil];
-                fileContent = [fileContent stringByReplacingOccurrencesOfString:oldFileName withString:newFileName];
-                [fileContent writeToFile:item2.abs_h_FilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-                // m
-                fileContent = [[NSString alloc] initWithContentsOfFile:item2.abs_m_FilePath encoding:NSUTF8StringEncoding error:nil];
-                fileContent = [fileContent stringByReplacingOccurrencesOfString:oldFileName withString:newFileName];
-                [fileContent writeToFile:item2.abs_m_FilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        if (item.type == FileIsXIB || item.type == FileIsStoryBoard) {
+            FileItem *hitItem = nomalItemsMap[item.fileName];
+            if (hitItem) {
+                // 特殊 (比如要改 aaa.swift, 这里找到 aaa.xib, aaa.storyboard 后续都一起改掉)
+                // 改名
+                item.reFileName = hitItem.reFileName;
+                continue;
             }
         }
-        // 记录
-        [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", newFileName]],
-                                @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", oldFileName]],
-        }];
-        [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", newFileName]],
-                                @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", oldFileName]],
-        }];
     }
     
-    for (FileItem *item in _swiftFileArr) {
-        if ([item.fileName containsString:@"+"]) {
-            // 这个情况也要在考虑
-            continue;
-        }
-        
-        NSString *oldFileName = item.fileName;
-        if (NO == [oldFileName hasPrefix:oldPre]) {
-            continue;
-        }
-        NSString *newFileName = [oldFileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
-        // swift
-        [reanmeInfo addObject:@{@"new":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", newFileName]],
-                                @"old":[item.parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", oldFileName]],
+    // 开始改文件内容
+    NSMutableArray *reNameItems = [NSMutableArray arrayWithCapacity:categoryItemsMap.count + nomalItemsMap.count];
+    [reNameItems addObjectsFromArray:categoryItemsMap.allValues]; // 一定先改扩展的
+    [reNameItems addObjectsFromArray:nomalItemsMap.allValues];
+    
+    // 这样遍历修改能减少文件io
+    [_codeFileArr enumerateObjectsUsingBlock:^(FileItem * _Nonnull codeFile, NSUInteger idx, BOOL * _Nonnull stop) {
+        [codeFile.absFilesPath enumerateObjectsUsingBlock:^(NSString * _Nonnull path, NSUInteger idx, BOOL * _Nonnull stop) {
+            NSError *err = nil;
+            NSMutableString *filecontent = [NSMutableString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
+            if (filecontent.length == 0 || err) {
+                NSLog(@"文件读取失败, 请检查重试 %@", err);
+                return;
+            }
+            __block BOOL didChange = NO;
+            [reNameItems enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                didChange = [self p_reguleChange:filecontent from:obj.fileName to:obj.reFileName];
+            }];
+            if (didChange) {
+                // 回写
+                err = nil;
+                [filecontent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
+                if (err) {
+                    NSLog(@"\n\n 艹 回写失败 ： %@", path);
+                }
+            }
         }];
-    }
+    }];
     
-    
+    // 开始改文件名
     NSFileManager *film = [NSFileManager defaultManager];
-    for (NSDictionary *dic in reanmeInfo) {
-        NSString *new = dic[@"new"];
-        NSString *old = dic[@"old"];
-        if (NO == [film moveItemAtPath:old toPath:new error:nil]) {
-            NSLog(@"rename error -----");
+    for (FileItem *item in _codeFileArr) {
+        if (item.reFileName.length <= 0) {
+            continue;
         }
+        for (NSString *path in item.absFilesPath) {
+            NSString *newName = [NSString stringWithFormat:@"%@.%@", item.reFileName, path.pathExtension];
+            NSString *newPath = [item.parentDirectoryABSPath stringByAppendingPathComponent:newName];
+            if (NO == [film moveItemAtPath:path toPath:newPath error:nil]) {
+                NSLog(@"cao rename error -----");
+                continue;
+            }
+            // 修改工程文件
+            if ([self p_reguleChange:pbxprojContentString from:path.lastPathComponent to:newName] == NO) {
+                NSLog(@"cao pbxprojContentString change faile -----");
+            }
+        }
+    }
+    // 回写pbxproj
+    NSError *err = nil;
+    if (![pbxprojContentString writeToFile:pbxprojPath atomically:YES encoding:NSUTF8StringEncoding error:&err]) {
+        NSLog(@"cao 回写pbxproj error -----%@", err);
     }
 }
 
@@ -335,9 +424,9 @@ static NSString * MD5_32(NSString *originString) {
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
     
     //
-    [self p__findVisiableFilePath:_rootDirectoryPath needOnlyHFile:NO];
+    [self p__findVisiableFilePath:_rootDirectoryPath];
     
-    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对文件",(int)_visiableFileArr.count+(int)_swiftFileArr.count]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
     
     // 混淆 hard string
@@ -346,17 +435,15 @@ static NSString * MD5_32(NSString *originString) {
 
 // 加密 hard string <金币,现金,钱,赚,红包,提现,任务>
 - (void)p_filterAndEncodeHardString {
-    for (FileItem *item in _visiableFileArr) {
-        for (int i = 0; i<2; i++) {
-            NSString *path = i == 0 ? [item abs_h_FilePath] : [item abs_m_FilePath];
-            [self hardString:item path:path ];
+    for (FileItem *item in _codeFileArr) {
+        NSArray *paths = [item absFilesPath];
+        for (int i = 0; i<paths.count; i++) {
+            NSString *path = paths[i];
+            @autoreleasepool {
+                [self hardString:item path:path];
+            }
         }
     }
-    
-    for (FileItem *item in _swiftFileArr) {
-        [self hardString:item path:[item abs_swift_FilePath]];
-    }
-    
     [self p_appendMessage:[NSString stringWithFormat:@"---hard string 处理结束"]];
 }
 
@@ -374,44 +461,45 @@ static NSString * MD5_32(NSString *originString) {
     
     // 寻找标记的hard string
     NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:fileCntent options:0 range:NSMakeRange(0, fileCntent.length)];
-    if ([matchs count] > 0) {
-        NSMutableString *newFileContent = [fileCntent mutableCopy];
-        // 得倒着来 （为了result.range 替换不出错）
-        for (int i = (int)matchs.count - 1; i >= 0; i--) {
-            // FlAG_ENCODE_STRING(@"xxxx")
-            NSTextCheckingResult *result = matchs[i];
-            NSString *matchSub        = [fileCntent substringWithRange:result.range];
-            NSString *matchSubContent = [matchSub substringWithRange:NSMakeRange(19, result.range.length - 19 - 1)];
-            matchSubContent = [matchSubContent stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-            if (item.isSwift) {
-                matchSubContent = [matchSubContent substringWithRange:NSMakeRange(1, matchSubContent.length - 2)];
-            }else{
-                matchSubContent = [matchSubContent substringWithRange:NSMakeRange(2, matchSubContent.length - 3)];
-            }
-            
-            if (matchSubContent.length == 0) {
-                continue;
-            }
-            // 混淆编码
-            NSMutableString *mTmp = [[[matchSubContent dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0] mutableCopy];
-            for (NSString *ch_ar in char_Arr) {
-                [mTmp insertString:ch_ar atIndex:arc4random() % mTmp.length];
-            }
-            if (item.isSwift) {
-                matchSub = [NSString stringWithFormat:@"DECODE_STRING(\"%@\")", mTmp];
-            }else{
-                matchSub = [NSString stringWithFormat:@"DECODE_STRING(@\"%@\")", mTmp];
-            }
-            
-            // 替换回去
-            [newFileContent replaceCharactersInRange:result.range withString:matchSub];
+    if ([matchs count] <= 0) {
+        return;
+    }
+    NSMutableString *newFileContent = [fileCntent mutableCopy];
+    // 得倒着来 （为了result.range 替换不出错）
+    for (int i = (int)matchs.count - 1; i >= 0; i--) {
+        // FlAG_ENCODE_STRING(@"xxxx")
+        NSTextCheckingResult *result = matchs[i];
+        NSString *matchSub        = [fileCntent substringWithRange:result.range];
+        NSString *matchSubContent = [matchSub substringWithRange:NSMakeRange(19, result.range.length - 19 - 1)];
+        matchSubContent = [matchSubContent stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (item.type == FileIsSwift) {
+            matchSubContent = [matchSubContent substringWithRange:NSMakeRange(1, matchSubContent.length - 2)];
+        }else{
+            matchSubContent = [matchSubContent substringWithRange:NSMakeRange(2, matchSubContent.length - 3)];
         }
         
-        // 写回去
-        [newFileContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
-        if (err) {
-            NSLog(@"\n\n 艹 回写失败 ： %@", path);
+        if (matchSubContent.length == 0) {
+            continue;
         }
+        // 混淆编码
+        NSMutableString *mTmp = [[[matchSubContent dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0] mutableCopy];
+        for (NSString *ch_ar in char_Arr) {
+            [mTmp insertString:ch_ar atIndex:arc4random() % mTmp.length];
+        }
+        if (item.type == FileIsSwift) {
+            matchSub = [NSString stringWithFormat:@"DECODE_STRING(\"%@\")", mTmp];
+        }else{
+            matchSub = [NSString stringWithFormat:@"DECODE_STRING(@\"%@\")", mTmp];
+        }
+        
+        // 替换回去
+        [newFileContent replaceCharactersInRange:result.range withString:matchSub];
+    }
+    
+    // 写回去
+    [newFileContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
+    if (err) {
+        NSLog(@"\n\n 艹 回写失败 ： %@", path);
     }
 }
 @end

@@ -8,25 +8,32 @@
 
 #import <Foundation/Foundation.h>
 
-//NS_ASSUME_NONNULL_BEGIN
+NS_ASSUME_NONNULL_BEGIN
+
+typedef NS_ENUM(NSInteger, FileType) {
+    FileIsSwift,     // swift
+    FileIsOnlyH,     // H
+    FileIsOnlyM,     // M
+    FileIsPCH,       // PCH
+    FileIsHAndM,     // H & M
+    FileIsXIB,     // xib
+    FileIsStoryBoard,     // storyboard
+};
+
 
 @interface FileItem : NSObject
 
+@property (nonatomic, assign) FileType type;
 @property (nonatomic, copy) NSString *fileName;              // 没后缀
 @property (nonatomic, copy) NSString *parentDirectoryABSPath;// 父目录
 
-// 同目录没有对应m文件
-@property (nonatomic, assign) BOOL onlyHFile;
+- (NSArray<NSString *> *)absFilesPath;
 
-@property (nonatomic, assign) BOOL isSwift;
-// .h
-- (NSString *)abs_h_FilePath;
-// .m
-- (NSString *)abs_m_FilePath;
-// .swift
-- (NSString *)abs_swift_FilePath;
+
+// 新名字
+@property (nonatomic, copy, nullable) NSString *reFileName;
 @end
 
 
 
-//NS_ASSUME_NONNULL_END
+NS_ASSUME_NONNULL_END

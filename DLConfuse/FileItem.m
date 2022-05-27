@@ -16,15 +16,31 @@
 
 
 #pragma mark - M
-- (NSString *)abs_h_FilePath {
-    return [_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", _fileName]];
-}
-
-- (NSString *)abs_m_FilePath {
-    return [_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", _fileName]];
-}
-
-- (NSString *)abs_swift_FilePath {
-    return [_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", _fileName]];
+- (NSArray<NSString *> *)absFilesPath {
+    if (_type == FileIsSwift) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", _fileName]]];
+    }
+    if (_type == FileIsOnlyH) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", _fileName]]];
+    }
+    if (_type == FileIsOnlyM) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", _fileName]]];
+    }
+    if (_type == FileIsHAndM) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.h", _fileName]],
+                 [_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.m", _fileName]],
+        ];
+    }
+    if (_type == FileIsPCH) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.pch", _fileName]]];
+    }
+    if (_type == FileIsXIB) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.xib", _fileName]]];
+    }
+    if (_type == FileIsStoryBoard) {
+        return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.storyboard", _fileName]]];
+    }
+    NSAssert(NO, @"漏判断啦啦啦");
+    return @[];
 }
 @end
