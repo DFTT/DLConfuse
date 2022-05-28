@@ -12,7 +12,7 @@
 @interface ViewController ()
 {
     // 根目录
-    NSString *_rootDirectoryPath;
+    NSURL *_rootDirectoryPathURL;
     
     // .xcodeproj 完整路径
     NSString *_xcodeprojPath;
@@ -114,10 +114,10 @@
             
             if ([[[NSFileManager.defaultManager attributesOfItemAtPath:document.path error:nil] objectForKey:NSFileType] isEqualToString:NSFileTypeDirectory]) {
                 
-                strongSelf->_rootDirectoryPath = document.path;
-                [self p_appendMessage:[NSString stringWithFormat:@"---已选中目录:%@",document.path]];
+                strongSelf->_rootDirectoryPathURL = document;
+                [self p_appendMessage:[NSString stringWithFormat:@"---已选中目录:%@",document]];
             }else {
-                [self p_appendMessage:[NSString stringWithFormat:@"---请选中一个目录:%@",document.path]];
+                [self p_appendMessage:[NSString stringWithFormat:@"---请选中一个文件目录:%@",document]];
             }
         }
     }];
@@ -125,90 +125,96 @@
 
 #pragma mark - 查找符合条件的文件
 
-- (void)p__findVisiableFilePath:(NSString *)rootPath {
-    if (rootPath.length == 0) {
+- (void)p__findVisiableFilesInURL:(NSURL *)rootURL {
+    if (!rootURL) {
         return;
     }
     NSFileManager *fileM = [NSFileManager defaultManager];
     
     BOOL isDirectiry = NO;
-    if (NO == [fileM fileExistsAtPath:rootPath isDirectory:&isDirectiry]) {
+    if (NO == [fileM fileExistsAtPath:rootURL.path isDirectory:&isDirectiry]) {
         // 过滤 非目录
         return;
     }
-    if (isDirectiry && rootPath.pathExtension.length != 0) {
+    if (isDirectiry && rootURL.pathExtension.length != 0) {
         // 过滤 有后缀的目录
-        if (!_xcodeprojPath && [rootPath.pathExtension isEqualToString:@"xcodeproj"]) {
-            _xcodeprojPath = rootPath;
+        if (!_xcodeprojPath && [rootURL.pathExtension isEqualToString:@"xcodeproj"]) {
+            _xcodeprojPath = rootURL.path;
         }
+        return;
+    }
+    if (isDirectiry && [rootURL.lastPathComponent hasPrefix:@"."]) {
+        // 过滤 .xx  这种命名的文件夹
         return;
     }
     
     NSError *err = nil;
-    NSArray<NSString *> *contents = [fileM contentsOfDirectoryAtPath:rootPath error:&err];
+    NSArray<NSURL *> *contentURLs = [fileM contentsOfDirectoryAtURL:rootURL
+                                         includingPropertiesForKeys:@[NSURLIsDirectoryKey]
+                                                            options:NSDirectoryEnumerationSkipsHiddenFiles   // 忽略隐藏文件/夹
+                                                              error:&err];
     if (err) {
-        NSLog(@"contents error = %@", err);
+        NSLog(@" 艹 contents error = %@", err);
         return;
     }
     //
     NSMutableSet *subhFileArr = [[NSMutableSet alloc] init];
     NSMutableSet *submFileArr = [[NSMutableSet alloc] init];
-    NSMutableArray *subDirectoryABSPathArr = [[NSMutableArray alloc] init];
+    NSMutableArray<NSURL *> *subDirectorysURL = [[NSMutableArray alloc] init];
     
-    for (NSString *subpath in contents) {
+    for (NSURL *subURL in contentURLs) {
         
-        NSString *absPath = [rootPath stringByAppendingPathComponent:subpath];
-        if ([fileM isWritableFileAtPath:absPath] == NO) {
+        if ([fileM isWritableFileAtPath:subURL.path] == NO) {
             // 不能修改的跳过
+            NSLog(@" 艹 这个文件没有覆写权限 = %@", subURL);
             continue;
         }
-        
-        if ([subpath.pathExtension isEqualToString:@"h"]) {
-            [subhFileArr addObject:subpath];
+        NSString *fileExtension = subURL.pathExtension;
+        if ([fileExtension isEqualToString:@"h"]) {
+            [subhFileArr addObject:subURL.lastPathComponent];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"m"]) {
-            [submFileArr addObject:subpath];
+        if ([fileExtension isEqualToString:@"m"]) {
+            [submFileArr addObject:subURL.lastPathComponent];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"swift"]) {
+        if ([fileExtension isEqualToString:@"swift"]) {
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = subpath.stringByDeletingPathExtension;
-            item.parentDirectoryABSPath = rootPath;
+            item.fileName               = subURL.URLByDeletingPathExtension.lastPathComponent;
+            item.parentDirectoryABSPath = rootURL.path;
             item.type                = FileIsSwift;
             [_codeFileArr addObject:item];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"pch"]) {
+        if ([fileExtension isEqualToString:@"pch"]) {
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = subpath.stringByDeletingPathExtension;
-            item.parentDirectoryABSPath = rootPath;
+            item.fileName               = subURL.URLByDeletingPathExtension.lastPathComponent;
+            item.parentDirectoryABSPath = rootURL.path;
             item.type                = FileIsPCH;
             [_codeFileArr addObject:item];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"xib"]) {
+        if ([fileExtension isEqualToString:@"xib"]) {
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = subpath.stringByDeletingPathExtension;
-            item.parentDirectoryABSPath = rootPath;
+            item.fileName               = subURL.URLByDeletingPathExtension.lastPathComponent;
+            item.parentDirectoryABSPath = rootURL.path;
             item.type                = FileIsXIB;
             [_IBFileArr addObject:item];
             continue;
         }
-        if ([subpath.pathExtension isEqualToString:@"storyboard"]) {
+        if ([fileExtension isEqualToString:@"storyboard"]) {
             FileItem *item              = [[FileItem alloc] init];
-            item.fileName               = subpath.stringByDeletingPathExtension;
-            item.parentDirectoryABSPath = rootPath;
+            item.fileName               = subURL.URLByDeletingPathExtension.lastPathComponent;
+            item.parentDirectoryABSPath = rootURL.path;
             item.type                = FileIsStoryBoard;
             [_IBFileArr addObject:item];
             continue;
         }
         
         err = nil;
-        NSDictionary *attr = [fileM attributesOfItemAtPath:absPath error:&err];
-        if (nil == err && [attr[NSFileType] isEqualToString:NSFileTypeDirectory]) {
-            // 没有后缀的子目录 后面继续递归
-            [subDirectoryABSPathArr addObject:absPath];
+        if ([[[subURL resourceValuesForKeys:@[NSURLIsDirectoryKey] error:&err] objectForKey:NSURLIsDirectoryKey] boolValue] == YES && nil == err) {
+            // 子目录 后面继续递归
+            [subDirectorysURL addObject:subURL];
         }
     }
     // 判断文件夹内.h/.m是否同时存在
@@ -218,7 +224,7 @@
             //.h .m同时存在
             FileItem *item              = [[FileItem alloc] init];
             item.fileName               = h.stringByDeletingPathExtension;
-            item.parentDirectoryABSPath = rootPath;
+            item.parentDirectoryABSPath = rootURL.path;
             item.type = FileIsHAndM;
             [_codeFileArr addObject:item];
             
@@ -228,7 +234,7 @@
         // 单独.h
         FileItem *item              = [[FileItem alloc] init];
         item.fileName               = h.stringByDeletingPathExtension;
-        item.parentDirectoryABSPath = rootPath;
+        item.parentDirectoryABSPath = rootURL.path;
         item.type = FileIsOnlyH;
         [_codeFileArr addObject:item];
     }];
@@ -236,20 +242,20 @@
     [submFileArr enumerateObjectsUsingBlock:^(NSString *m, BOOL * _Nonnull stop) {
         FileItem *item              = [[FileItem alloc] init];
         item.fileName               = m.stringByDeletingPathExtension;
-        item.parentDirectoryABSPath = rootPath;
+        item.parentDirectoryABSPath = rootURL.path;
         item.type = FileIsOnlyM;
         [_codeFileArr addObject:item];
     }];
     
     // 递归子路径
-    for (NSString *absDir in subDirectoryABSPathArr) {
-        [self p__findVisiableFilePath:absDir];
+    for (NSURL *subDirURL in subDirectorysURL) {
+        [self p__findVisiableFilesInURL:subDirURL];
     }
 }
 #pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
-    [self p__findVisiableFilePath:_rootDirectoryPath];
+    [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
@@ -265,25 +271,33 @@
     [self p_appendMessage:@"前缀修改完成"];
 }
 
-- (BOOL)p_reguleChange:(NSMutableString *)mContent from:(NSString *)old to:(NSString *)new {
+
+// fromFile 这个参数是为了debugLog
+- (BOOL)p_reguleChange:(NSMutableString *)mContent fromFile:(NSString *)file match:(NSString *)old to:(NSString *)new {
     if (new.length <= 0 ) {
+        NSLog(@" 艹 这里不会走的");
         return NO;
     }
-    old = [old stringByReplacingOccurrencesOfString:@"+" withString:@"\\+"];
-    old = [old stringByReplacingOccurrencesOfString:@"." withString:@"\\."];
-    NSString *pattern = [NSString stringWithFormat:@"\\b%@\\b", old];
+    // 构造正则表达式, 处理特殊字符
+    NSString *temp = [old stringByReplacingOccurrencesOfString:@"+" withString:@"\\+"];
+    temp = [temp stringByReplacingOccurrencesOfString:@"." withString:@"\\."];
+    NSString *pattern = [NSString stringWithFormat:@"\\b%@\\b", temp];
     NSError *err = nil;
-    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:NSRegularExpressionCaseInsensitive error:&err];
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:&err];
     if (!regex || err) {
-        NSLog(@"正则表达式创建失败, 请检查 %@", err);
+        NSLog(@" 艹 正则表达式创建失败, 请检查 %@", err);
         return NO;
     }
     NSArray<NSTextCheckingResult *> *matchRes = [regex matchesInString:mContent options:0 range:NSMakeRange(0, mContent.length)];
+    //    NSLog(@" DEBUG LOG %@ 中匹配到 %d 个 %@", file, (int)matchRes.count, old);
     if (matchRes.count == 0) {
         return NO;
     }
     for (NSInteger i = matchRes.count - 1; i >= 0; i--) {
         NSTextCheckingResult *result = matchRes[i];
+        //        if (![[mContent substringWithRange:result.range] isEqualToString:old]) {
+        //            NSLog(@" DEBUG LOG 匹配错啦 错啦 错啦: %@", old);
+        //        }
         [mContent replaceCharactersInRange:result.range withString:new];
     }
     return YES;
@@ -304,8 +318,8 @@
     // 筛选需要修改文件名的
     NSMutableDictionary<NSString *, FileItem *> *nomalItemsMap = [NSMutableDictionary dictionaryWithCapacity:200];
     for (FileItem *item in _codeFileArr) {
-        if ((item.type == FileIsHAndM || item.type == FileIsSwift) && ![item.fileName containsString:@"+"] && [item.fileName hasPrefix:oldPre]) {
-            // 非扩展 (后面应该同时考虑 同名的xib 扩展文件)
+        if ((item.type == FileIsHAndM || item.type == FileIsSwift) && [item.fileName componentsSeparatedByString:@"+"].count != 2 && [item.fileName hasPrefix:oldPre]) {
+            // 非扩展 (后面应该同时考虑 同名的xib 扩展文件)  (名字中1个"+"认为是扩展 后面处理, 没有或2个及以上"+"认为是普通文件 这里处理)
             item.reFileName = [item.fileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
             nomalItemsMap[item.fileName] = item;
         }
@@ -333,12 +347,8 @@
             }
             
             if (item.type == FileIsHAndM || item.type == FileIsSwift) {
-                // 普通
+                // 普通扩展 只判断后半截 后续替换时 只替换aaa+bbb.h 及 bbb, aaa不能替换 会错, 因为如果aaa满足改名条件, 则会命中上面的逻辑
                 BOOL hit = NO;
-                if ([pre hasPrefix:oldPre]) {
-                    pre = [pre stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
-                    hit = YES;
-                }
                 if ([suf hasPrefix:oldPre]) {
                     suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
                     hit = YES;
@@ -364,23 +374,45 @@
     }
     
     // 开始改文件内容
-    NSMutableArray *reNameItems = [NSMutableArray arrayWithCapacity:categoryItemsMap.count + nomalItemsMap.count];
-    [reNameItems addObjectsFromArray:categoryItemsMap.allValues]; // 一定先改扩展的
-    [reNameItems addObjectsFromArray:nomalItemsMap.allValues];
+    if (categoryItemsMap.count + nomalItemsMap.count == 0) {
+        [self p_appendMessage:[NSString stringWithFormat:@"---没有发现需要修改前缀的文件"]];
+        NSLog(@"\n\n 完成拉~~~~~~~~~\n");
+        return;
+    }
+    [self p_appendMessage:[NSString stringWithFormat:@"---有 %d 组需要修改前缀的代码文件", (int)(categoryItemsMap.count + nomalItemsMap.count)]];
     
     // 这样遍历修改能减少文件io
-    [_codeFileArr enumerateObjectsUsingBlock:^(FileItem * _Nonnull codeFile, NSUInteger idx, BOOL * _Nonnull stop) {
-        [codeFile.absFilesPath enumerateObjectsUsingBlock:^(NSString * _Nonnull path, NSUInteger idx, BOOL * _Nonnull stop) {
+    NSMutableArray *allFiles = [_codeFileArr mutableCopy];
+    [allFiles addObjectsFromArray:_IBFileArr]; // ib文件也要修改
+    [allFiles enumerateObjectsUsingBlock:^(FileItem * _Nonnull codeFile, NSUInteger idx, BOOL * _Nonnull stop) {
+        for (NSString *path in codeFile.absFilesPath) {
             NSError *err = nil;
             NSMutableString *filecontent = [NSMutableString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
             if (filecontent.length == 0 || err) {
-                NSLog(@"文件读取失败, 请检查重试 %@", err);
+                NSLog(@" 艹 文件读取失败, 请检查重试 %@", err);
                 return;
             }
             __block BOOL didChange = NO;
-            [reNameItems enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                didChange = [self p_reguleChange:filecontent from:obj.fileName to:obj.reFileName];
+            // 一定先改扩展的
+            [categoryItemsMap.allValues enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                // 记录是否修改过 用 "|="
+                // 改全名
+                didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
+                // 改后半截
+                NSArray *oldStrings = [obj.fileName componentsSeparatedByString:@"+"];
+                NSArray *newStrings = [obj.reFileName componentsSeparatedByString:@"+"];
+                if (oldStrings.count == 2 && oldStrings.count == newStrings.count) {
+                    didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:oldStrings.lastObject to:newStrings.lastObject];
+                }else {
+                    NSLog(@" 艹 出错拉, 请检查重试 %@", err);
+                }
             }];
+            // 在改普通的
+            [nomalItemsMap.allValues enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                // 记录是否修改过 用 "|="
+                didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
+            }];
+            
             if (didChange) {
                 // 回写
                 err = nil;
@@ -389,7 +421,7 @@
                     NSLog(@"\n\n 艹 回写失败 ： %@", path);
                 }
             }
-        }];
+        }
     }];
     
     // 开始改文件名
@@ -402,20 +434,22 @@
             NSString *newName = [NSString stringWithFormat:@"%@.%@", item.reFileName, path.pathExtension];
             NSString *newPath = [item.parentDirectoryABSPath stringByAppendingPathComponent:newName];
             if (NO == [film moveItemAtPath:path toPath:newPath error:nil]) {
-                NSLog(@"cao rename error -----");
+                NSLog(@" 艹  rename error -----");
                 continue;
             }
             // 修改工程文件
-            if ([self p_reguleChange:pbxprojContentString from:path.lastPathComponent to:newName] == NO) {
-                NSLog(@"cao pbxprojContentString change faile -----");
+            if ([self p_reguleChange:pbxprojContentString fromFile:pbxprojPath.lastPathComponent match:path.lastPathComponent to:newName] == NO) {
+                NSLog(@" 艹  pbxprojContentString change faile -----");
             }
         }
     }
     // 回写pbxproj
     NSError *err = nil;
     if (![pbxprojContentString writeToFile:pbxprojPath atomically:YES encoding:NSUTF8StringEncoding error:&err]) {
-        NSLog(@"cao 回写pbxproj error -----%@", err);
+        NSLog(@" 艹  回写pbxproj error -----%@", err);
     }
+    
+    NSLog(@"\n\n 完成拉~~~~~~~~~\n");
 }
 
 
@@ -424,7 +458,7 @@
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
     
     //
-    [self p__findVisiableFilePath:_rootDirectoryPath];
+    [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
@@ -453,7 +487,7 @@
     NSError *err         = nil;
     NSString *fileCntent = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
     if (!fileCntent || err) {
-        NSLog(@"file read failure : %@", err);
+        NSLog(@" 艹 file read failure : %@", err);
         return;
     }
     
