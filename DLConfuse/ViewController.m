@@ -254,6 +254,7 @@
 }
 #pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
+
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
     [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
@@ -304,8 +305,8 @@
 }
 
 - (void)modify {
-    NSString *oldPre = @"BDD";
-    NSString *newPre = @"DDL";
+    NSString *oldPre = @"AF";
+    NSString *newPre = @"XM_AF";
     
     // 工程文件_xcodeprojPath/project.pbxproj 内容
     NSString *pbxprojPath = [_xcodeprojPath stringByAppendingPathComponent:@"project.pbxproj"];
@@ -451,7 +452,53 @@
     
     NSLog(@"\n\n 完成拉~~~~~~~~~\n");
 }
+#pragma mark - 三方库加前缀
+// 这个方法 危险, 仅是为了给三方库加前缀用的 (文件名修改 请使用上面的方法, 单独调用此方法; 文件夹路径仅设置需要修改的库源码文件夹即可)
+// 遍历所有代码文件 修改所有符合规则的单词
+- (void)nuke___modifyThirdLibary {
+    // 重新查找文件
+    [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
+    
+    NSString *oldPre = @"AF";
+    NSString *newPre = @"XM_AF";
+    
+    // 构造正则表达式
+    NSString *pattern = [NSString stringWithFormat:@"\\b%@.+?\\b", oldPre];
+    NSError *err = nil;
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:&err];
+    if (!regex || err) {
+        NSLog(@" 艹 正则表达式创建失败, 请检查 %@", err);
+        return;
+    }
+    
+    // 全部修改
+    for (FileItem *item in _codeFileArr) {
+        
+        [item.absFilesPath enumerateObjectsWithOptions:NSEnumerationConcurrent usingBlock:^(NSString * _Nonnull path, NSUInteger idx, BOOL * _Nonnull stop) {
+            NSMutableString *mContent = [NSMutableString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+            if (mContent.length == 0) {
+                NSLog(@" 艹 文件读取失败, 请检查 %@", path);
+                return;
+            }
+            NSArray<NSTextCheckingResult *> *matchRes = [regex matchesInString:mContent options:0 range:NSMakeRange(0, mContent.length)];
+            if (matchRes.count == 0) {
+                return;
+            }
+            for (NSInteger i = matchRes.count - 1; i >= 0; i--) {
+                NSTextCheckingResult *result = matchRes[i];
+                // 只替换前缀即可
+                [mContent replaceCharactersInRange:NSMakeRange(result.range.location, oldPre.length) withString:newPre];
+            }
+            // 回写
+            if ([mContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil] == NO) {
+                NSLog(@"\n\n 艹 回写失败 ： %@", path);
+            }
+        }];
 
+    }
+    
+    NSLog(@"\n\n 修改完成啦啦啦");
+}
 
 #pragma mark - 混淆标记的字符串
 - (void)encryptBtnAction {
