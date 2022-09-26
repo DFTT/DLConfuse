@@ -16,7 +16,7 @@ typedef NS_ENUM(NSInteger, FileType) {
     FileIsOnlyM,     // M
     FileIsPCH,       // PCH
     FileIsHAndM,     // H & M
-    FileIsXIB,     // xib
+    FileIsXIB,       // xib
     FileIsStoryBoard,     // storyboard
 };
 

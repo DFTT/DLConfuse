@@ -37,6 +37,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5B24557328E13CBC00D1EFB9 /* HardStringEncryptDecryptUnit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HardStringEncryptDecryptUnit.h; sourceTree = "<group>"; };
 		5B4A69F42244CBD100459F2C /* DLConfuse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DLConfuse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B4A69F72244CBD100459F2C /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		5B4A69F82244CBD100459F2C /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -86,6 +87,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		5B24557228E13C0400D1EFB9 /* HardStringUnit */ = {
+			isa = PBXGroup;
+			children = (
+				5B24557328E13CBC00D1EFB9 /* HardStringEncryptDecryptUnit.h */,
+			);
+			path = HardStringUnit;
+			sourceTree = "<group>";
+		};
 		5B4A69EB2244CBD100459F2C = {
 			isa = PBXGroup;
 			children = (
@@ -116,6 +125,7 @@
 				5B4A69FB2244CBD100459F2C /* ViewController.m */,
 				5B4A6A2B2248D4D900459F2C /* FileItem.h */,
 				5B4A6A2C2248D4D900459F2C /* FileItem.m */,
+				5B24557228E13C0400D1EFB9 /* HardStringUnit */,
 				5B4A69FD2244CBD300459F2C /* Assets.xcassets */,
 				5B4A69FF2244CBD300459F2C /* Main.storyboard */,
 				5B4A6A022244CBD300459F2C /* Info.plist */,
@@ -468,7 +478,7 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dadadongl.DLConfuse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "DLConfuse/DLConfuse-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "${SRCROOT}/DLConfuse/DLConfuse-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
@@ -490,7 +500,7 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dadadongl.DLConfuse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "DLConfuse/DLConfuse-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "${SRCROOT}/DLConfuse/DLConfuse-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

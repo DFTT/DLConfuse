@@ -8,6 +8,7 @@
 
 #import "ViewController.h"
 #import "FileItem.h"
+#import "HardStringEncryptDecryptUnit.h"
 
 @interface ViewController ()
 {
@@ -254,7 +255,7 @@
 }
 #pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
-
+    
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
     [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
@@ -494,7 +495,7 @@
                 NSLog(@"\n\n 艹 回写失败 ： %@", path);
             }
         }];
-
+        
     }
     
     NSLog(@"\n\n 修改完成啦啦啦");
@@ -529,58 +530,78 @@
 }
 
 - (void)hardString:(FileItem *)item path:(NSString *)path {
-    NSRegularExpression *regExp = [NSRegularExpression regularExpressionWithPattern:@"FlAG_ENCODE_STRING\\(.+?\\)" options:NSRegularExpressionCaseInsensitive error:nil];
     
-    NSError *err         = nil;
+    NSRegularExpression *regExp = nil;
+    NSError *err = nil;
+    if (item.type == FileIsSwift) {
+        regExp = [NSRegularExpression regularExpressionWithPattern:@"(\"\")|(\".*?[^\\\\]\")" options:NSRegularExpressionCaseInsensitive error:&err];
+    }else if (item.type == FileIsOnlyM || item.type == FileIsHAndM) {
+        regExp = [NSRegularExpression regularExpressionWithPattern:@"(@\"\")|(@\".*?[^\\\\]\")" options:NSRegularExpressionCaseInsensitive error:&err];
+    }
+    
+    if (regExp == nil) {
+        return;
+    }
+    
+    err = nil;
     NSString *fileCntent = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
     if (!fileCntent || err) {
         NSLog(@" 艹 file read failure : %@", err);
         return;
     }
     
-    NSArray *char_Arr = @[@"?",@"<",@"!",@"*",@">",@"]"];
-    
-    // 寻找标记的hard string
+    // 寻找hard string
     NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:fileCntent options:0 range:NSMakeRange(0, fileCntent.length)];
     if ([matchs count] <= 0) {
         return;
     }
+    BOOL writeback = NO;
     NSMutableString *newFileContent = [fileCntent mutableCopy];
     // 得倒着来 （为了result.range 替换不出错）
     for (int i = (int)matchs.count - 1; i >= 0; i--) {
-        // FlAG_ENCODE_STRING(@"xxxx")
         NSTextCheckingResult *result = matchs[i];
-        NSString *matchSub        = [fileCntent substringWithRange:result.range];
-        NSString *matchSubContent = [matchSub substringWithRange:NSMakeRange(19, result.range.length - 19 - 1)];
-        matchSubContent = [matchSubContent stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *matchSub = [fileCntent substringWithRange:result.range];
+        NSString *matchSubContent = nil;
         if (item.type == FileIsSwift) {
-            matchSubContent = [matchSubContent substringWithRange:NSMakeRange(1, matchSubContent.length - 2)];
+            matchSubContent = [matchSub substringWithRange:NSMakeRange(1, matchSub.length - 2)];
         }else{
-            matchSubContent = [matchSubContent substringWithRange:NSMakeRange(2, matchSubContent.length - 3)];
+            matchSubContent = [matchSub substringWithRange:NSMakeRange(2, matchSub.length - 3)];
         }
-        
         if (matchSubContent.length == 0) {
+            // 空串不需混淆
             continue;
         }
+        
         // 混淆编码
-        NSMutableString *mTmp = [[[matchSubContent dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0] mutableCopy];
-        for (NSString *ch_ar in char_Arr) {
-            [mTmp insertString:ch_ar atIndex:arc4random() % mTmp.length];
+        NSString *encriptedStr = XYZ_encriptHardString(matchSubContent);
+        if (encriptedStr.length == 0) {
+            NSLog(@"注意啦注意啦: 硬编码字符串加密有bug啦啦~");
+            continue;
         }
+        NSString *new = nil;
         if (item.type == FileIsSwift) {
-            matchSub = [NSString stringWithFormat:@"DECODE_STRING(\"%@\")", mTmp];
-        }else{
-            matchSub = [NSString stringWithFormat:@"DECODE_STRING(@\"%@\")", mTmp];
+            new = [NSString stringWithFormat:@"XYZ_decriptHardString(\"%@\")", encriptedStr];
+        }else {
+            new = [NSString stringWithFormat:@"XYZ_decriptHardString(@\"%@\")", encriptedStr];
         }
         
+        if (new.length == 0) {
+            NSLog(@"注意啦注意啦: 创建字符串失败啦~");
+            continue;
+        }
         // 替换回去
-        [newFileContent replaceCharactersInRange:result.range withString:matchSub];
+        [newFileContent replaceCharactersInRange:result.range withString:new];
+        writeback = YES;
+        
+        //测试
+//        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
     }
-    
-    // 写回去
-    [newFileContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
-    if (err) {
-        NSLog(@"\n\n 艹 回写失败 ： %@", path);
+    if (writeback) {
+        // 写回去
+        [newFileContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
+        if (err) {
+            NSLog(@"\n\n 艹 回写失败 ： %@", path);
+        }
     }
 }
 @end

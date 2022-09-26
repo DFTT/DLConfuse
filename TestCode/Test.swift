@@ -8,10 +8,16 @@
 
 import Foundation
 
-class Test {
-    
-    
-}
+class Test {}
+
 class Test2: NSObject {
-    
+    func aaa() {
+        let a = "普通字符串"
+        let b = "包含一个\"转义字符"
+        let v = "包含两个\"转义\"字符" + "" + "拼接字符串"
+        
+        print(a)
+        print(b)
+        print(v)
+    }
 }

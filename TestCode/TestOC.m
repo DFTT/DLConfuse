@@ -7,15 +7,16 @@
 //
 
 #import "TestOC.h"
-
-// 标识字符串
-#define FlAG_ENCODE_STRING(str) str
-
+#import "HardStringEncryptDecryptUnit.h"
 
 @implementation TestOC
 - (void)aaaa {
-    FlAG_ENCODE_STRING(@"123\\n456");
-    FlAG_ENCODE_STRING(@"321\n654");
+    NSString *aa = (@"123\\n456");
+    NSString *bb = (@"321\n654");
 }
-    
+
+- (void)bbbbbb {
+    NSString *nnn = [@"你好吗\"先生" stringByAppendingString:@" 当然好啦"];
+    NSString *nn1 = @"你好吗\"先生2\"";
+}
 @end

@@ -11,7 +11,8 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TestOC : NSObject
-
+- (void)aaaa ;
+- (void)bbbbbb ;
 @end
 
 NS_ASSUME_NONNULL_END
