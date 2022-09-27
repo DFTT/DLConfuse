@@ -10,6 +10,15 @@
 #import "FileItem.h"
 #import "HardStringEncryptDecryptUnit.h"
 
+@interface XYZBaseView : NSView
+@end
+@implementation XYZBaseView
+- (BOOL)isFlipped {
+    return YES;
+}
+@end
+
+
 @interface ViewController ()
 {
     // 根目录
@@ -25,8 +34,12 @@
     // .xib  .stroryboare
     NSMutableArray<FileItem *> *_IBFileArr;
     
+    // 需要过滤掉的 文件名/文件夹
+    NSSet<NSString *> *_filterFileNames;
+    
     // UI
     NSTextView *_messageView;
+    NSTextField *_filterTf;
 }
 @end
 
@@ -45,28 +58,38 @@
 - (void)__reset {
     _codeFileArr = [[NSMutableArray alloc] init];
     _IBFileArr = [[NSMutableArray alloc] init];
+    _xcodeprojPath = nil;
+    
+    NSArray *names = [_filterTf.stringValue componentsSeparatedByString:@";"];
+    _filterFileNames = [NSSet setWithArray:names];
 }
 #pragma mark - UI
 - (void)setupUI {
+//    CGSize size = [NSApplication sharedApplication].windows.firstObject.frame.size;
+    
     // btn
-    NSButton *btn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 10, 100, 50)];
+    NSButton *btn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 10, 200, 50)];
     btn.bezelStyle = NSBezelStyleRounded;
     [btn setTitle:@"选择代码目录"];
     [btn setTarget:self];
     [btn setAction:@selector(btnClickAction)];
     [self.view addSubview:btn];
     
+    NSTextField *tf = [[NSTextField alloc] initWithFrame:CGRectMake(5, 60, 200, 50)];
+    tf.placeholderString = @"要忽略的文件夹 用分号分隔 (例如: Verder;YYKit)";
+    [self.view addSubview:tf];
+    _filterTf = tf;
+    
     //
-    NSButton *encryptBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 110, 100, 50)];
+    NSButton *encryptBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 210, 200, 50)];
     encryptBtn.bezelStyle = NSBezelStyleRounded;
-    [encryptBtn setTitle:@"开始加密字符串"];
+    [encryptBtn setTitle:@"hardSrtring加密"];
     [encryptBtn setTarget:self];
     [encryptBtn setAction:@selector(encryptBtnAction)];
     [self.view addSubview:encryptBtn];
     
-    
     //
-    NSButton *addPreBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 160, 180, 50)];
+    NSButton *addPreBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 260, 200, 50)];
     addPreBtn.bezelStyle = NSBezelStyleRounded;
     [addPreBtn setTitle:@"代码文件批量增加前缀Beta"];
     [addPreBtn setTarget:self];
@@ -75,7 +98,7 @@
     
     
     //
-    NSScrollView *scrolleView = [[NSScrollView alloc] initWithFrame:CGRectMake(190, 10, 800, self.view.bounds.size.height - 10)];
+    NSScrollView *scrolleView = [[NSScrollView alloc] initWithFrame:CGRectMake(220, 10, 800, self.view.bounds.size.height - 10)];
     [scrolleView setHasVerticalScroller:YES];
     [scrolleView setHasHorizontalScroller:NO];
     [self.view addSubview:scrolleView];
@@ -149,6 +172,12 @@
         return;
     }
     
+    if ([_filterFileNames containsObject:rootURL.lastPathComponent]) {
+        // 命中过滤
+        NSLog(@" 命中过滤文件夹 %@", rootURL.lastPathComponent);
+        return;
+    }
+    
     NSError *err = nil;
     NSArray<NSURL *> *contentURLs = [fileM contentsOfDirectoryAtURL:rootURL
                                          includingPropertiesForKeys:@[NSURLIsDirectoryKey]
@@ -167,7 +196,7 @@
         
         if ([fileM isWritableFileAtPath:subURL.path] == NO) {
             // 不能修改的跳过
-            NSLog(@" 艹 这个文件没有覆写权限 = %@", subURL);
+            NSLog(@" 艹 跳过 这个文件没有覆写权限 = %@", subURL);
             continue;
         }
         NSString *fileExtension = subURL.pathExtension;
@@ -257,6 +286,7 @@
 - (void)addPreBtnAction {
     
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
+    [self __reset];
     [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
@@ -458,6 +488,7 @@
 // 遍历所有代码文件 修改所有符合规则的单词
 - (void)nuke___modifyThirdLibary {
     // 重新查找文件
+    [self __reset];
     [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
     NSString *oldPre = @"AF";
@@ -506,6 +537,7 @@
     [self p_appendMessage:@"---开始搜索符合条件的文件(.h/.m/.swift)"];
     
     //
+    [self __reset];
     [self p__findVisiableFilesInURL:_rootDirectoryPathURL];
     
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
@@ -594,7 +626,7 @@
         writeback = YES;
         
         //测试
-//        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
+        //        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
     }
     if (writeback) {
         // 写回去
