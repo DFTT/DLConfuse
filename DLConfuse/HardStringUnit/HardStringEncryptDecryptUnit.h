@@ -10,7 +10,7 @@
 
 
 /// 加密 (工具使用此方法生成密文)
-static inline NSString *XYZ_encriptHardString(NSString *hstring) {
+static inline NSString *_Nonnull XYZ_encriptHardString(NSString *hstring) {
     
     NSString *base64 = [[hstring dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
     int intervel = arc4random() % 6 + 3; // 3 - 9
@@ -35,7 +35,7 @@ static inline NSString *XYZ_encriptHardString(NSString *hstring) {
 
 
 /// 解密 (工具把原明文字符串 替换为XYZ_decriptHardString(密文))
-static inline NSString *XYZ_decriptHardString(NSString *hstring) {
+static inline NSString *_Nonnull XYZ_decriptHardString(NSString *hstring) {
     
     // 取出插入间隔
     int intervel = [[hstring substringToIndex:1] intValue];

@@ -65,7 +65,7 @@
 }
 #pragma mark - UI
 - (void)setupUI {
-//    CGSize size = [NSApplication sharedApplication].windows.firstObject.frame.size;
+    //    CGSize size = [NSApplication sharedApplication].windows.firstObject.frame.size;
     
     // btn
     NSButton *btn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 10, 200, 50)];
@@ -582,55 +582,70 @@
         return;
     }
     
-    // 寻找hard string
-    NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:fileCntent options:0 range:NSMakeRange(0, fileCntent.length)];
-    if ([matchs count] <= 0) {
-        return;
-    }
-    BOOL writeback = NO;
-    NSMutableString *newFileContent = [fileCntent mutableCopy];
-    // 得倒着来 （为了result.range 替换不出错）
-    for (int i = (int)matchs.count - 1; i >= 0; i--) {
-        NSTextCheckingResult *result = matchs[i];
-        NSString *matchSub = [fileCntent substringWithRange:result.range];
-        NSString *matchSubContent = nil;
-        if (item.type == FileIsSwift) {
-            matchSubContent = [matchSub substringWithRange:NSMakeRange(1, matchSub.length - 2)];
-        }else{
-            matchSubContent = [matchSub substringWithRange:NSMakeRange(2, matchSub.length - 3)];
+    __block BOOL writeback = NO;
+    NSMutableString *newContentString = [NSMutableString stringWithCapacity:fileCntent.length];
+    // 按行处理
+    [fileCntent enumerateLinesUsingBlock:^(NSString * _Nonnull line, BOOL * _Nonnull stop) {
+        // 寻找hard string
+        NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:line options:0 range:NSMakeRange(0, line.length)];
+        if ([matchs count] <= 0) {
+            [newContentString appendString:line];
+            [newContentString appendString:@"\n"];
+            return;
         }
-        if (matchSubContent.length == 0) {
-            // 空串不需混淆
-            continue;
+        if ([line rangeOfString:@"static"].location != NSNotFound || [line rangeOfString:@"const"].location != NSNotFound ) {
+            // 跳过
+            [newContentString appendString:line];
+            [newContentString appendString:@"\n"];
+            return;
         }
         
-        // 混淆编码
-        NSString *encriptedStr = XYZ_encriptHardString(matchSubContent);
-        if (encriptedStr.length == 0) {
-            NSLog(@"注意啦注意啦: 硬编码字符串加密有bug啦啦~");
-            continue;
+        NSMutableString *newLine = [line mutableCopy];
+        // 得倒着来 （为了result.range 替换不出错）
+        for (int i = (int)matchs.count - 1; i >= 0; i--) {
+            NSTextCheckingResult *result = matchs[i];
+            NSString *matchedString = [line substringWithRange:result.range];
+            NSString *hardStringCode = nil;
+            if (item.type == FileIsSwift) {
+                hardStringCode = [matchedString substringWithRange:NSMakeRange(1, matchedString.length - 2)];
+            }else{
+                hardStringCode = [matchedString substringWithRange:NSMakeRange(2, matchedString.length - 3)];
+            }
+            if (hardStringCode.length == 0) {
+                // 空串不需混淆
+                continue;
+            }
+            
+            // 混淆编码
+            NSString *encriptedStr = XYZ_encriptHardString(hardStringCode);
+            if (encriptedStr.length == 0) {
+                NSLog(@"注意啦注意啦: 硬编码字符串加密有bug啦啦~");
+                continue;
+            }
+            NSString *new = nil;
+            if (item.type == FileIsSwift) {
+                new = [NSString stringWithFormat:@"XYZ_decriptHardString(\"%@\")", encriptedStr];
+            }else {
+                new = [NSString stringWithFormat:@"XYZ_decriptHardString(@\"%@\")", encriptedStr];
+            }
+            
+            if (new.length == 0) {
+                NSLog(@"注意啦注意啦: 创建字符串失败啦~");
+                continue;
+            }
+            // 替换回去
+            [newLine replaceCharactersInRange:result.range withString:new];
+            writeback = YES;
+            //测试
+            //        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
         }
-        NSString *new = nil;
-        if (item.type == FileIsSwift) {
-            new = [NSString stringWithFormat:@"XYZ_decriptHardString(\"%@\")", encriptedStr];
-        }else {
-            new = [NSString stringWithFormat:@"XYZ_decriptHardString(@\"%@\")", encriptedStr];
-        }
-        
-        if (new.length == 0) {
-            NSLog(@"注意啦注意啦: 创建字符串失败啦~");
-            continue;
-        }
-        // 替换回去
-        [newFileContent replaceCharactersInRange:result.range withString:new];
-        writeback = YES;
-        
-        //测试
-        //        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
-    }
+        [newContentString appendString:newLine];
+        [newContentString appendString:@"\n"];
+    }];
+ 
     if (writeback) {
         // 写回去
-        [newFileContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
+        [newContentString writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
         if (err) {
             NSLog(@"\n\n 艹 回写失败 ： %@", path);
         }
