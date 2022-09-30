@@ -543,6 +543,8 @@
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 对.h/.m/.swift/.pch 文件",(int)_codeFileArr.count]];
     [self p_appendMessage:[NSString stringWithFormat:@"---共找到 %d 个IB文件",(int)_IBFileArr.count]];
     
+    [self p_appendMessage:@"开始混淆HardString..."];
+    
     // 混淆 hard string
     [self p_filterAndEncodeHardString];
 }
@@ -572,6 +574,7 @@
     }
     
     if (regExp == nil) {
+        // 其它文件不处理
         return;
     }
     
@@ -583,66 +586,41 @@
     }
     
     __block BOOL writeback = NO;
-    NSMutableString *newContentString = [NSMutableString stringWithCapacity:fileCntent.length];
-    // 按行处理
-    [fileCntent enumerateLinesUsingBlock:^(NSString * _Nonnull line, BOOL * _Nonnull stop) {
-        // 寻找hard string
-        NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:line options:0 range:NSMakeRange(0, line.length)];
-        if ([matchs count] <= 0) {
-            [newContentString appendString:line];
-            [newContentString appendString:@"\n"];
-            return;
-        }
-        if ([line rangeOfString:@"static"].location != NSNotFound || [line rangeOfString:@"const"].location != NSNotFound ) {
-            // 跳过
-            [newContentString appendString:line];
-            [newContentString appendString:@"\n"];
-            return;
-        }
-        
-        NSMutableString *newLine = [line mutableCopy];
-        // 得倒着来 （为了result.range 替换不出错）
-        for (int i = (int)matchs.count - 1; i >= 0; i--) {
-            NSTextCheckingResult *result = matchs[i];
-            NSString *matchedString = [line substringWithRange:result.range];
-            NSString *hardStringCode = nil;
-            if (item.type == FileIsSwift) {
-                hardStringCode = [matchedString substringWithRange:NSMakeRange(1, matchedString.length - 2)];
-            }else{
-                hardStringCode = [matchedString substringWithRange:NSMakeRange(2, matchedString.length - 3)];
-            }
-            if (hardStringCode.length == 0) {
-                // 空串不需混淆
-                continue;
-            }
-            
-            // 混淆编码
-            NSString *encriptedStr = XYZ_encriptHardString(hardStringCode);
-            if (encriptedStr.length == 0) {
-                NSLog(@"注意啦注意啦: 硬编码字符串加密有bug啦啦~");
-                continue;
-            }
-            NSString *new = nil;
-            if (item.type == FileIsSwift) {
-                new = [NSString stringWithFormat:@"XYZ_decriptHardString(\"%@\")", encriptedStr];
-            }else {
-                new = [NSString stringWithFormat:@"XYZ_decriptHardString(@\"%@\")", encriptedStr];
-            }
-            
-            if (new.length == 0) {
-                NSLog(@"注意啦注意啦: 创建字符串失败啦~");
-                continue;
-            }
-            // 替换回去
-            [newLine replaceCharactersInRange:result.range withString:new];
+    NSString *newContentString = nil;
+    
+    if (item.type == FileIsSwift) {
+        NSString *changedString = [self p__confuseTargetString:fileCntent regx:regExp isSwift:YES];
+        if (changedString.length > 0) {
             writeback = YES;
-            //测试
-            //        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
+            newContentString = changedString;
         }
-        [newContentString appendString:newLine];
-        [newContentString appendString:@"\n"];
-    }];
- 
+    }else {
+        // 为了避免匹配到 static const NSString *xx = @""
+        // 这里先匹配出 @implementation ... @end 的内容, 然后在匹配字符串
+        NSRegularExpression *mContentExp = [NSRegularExpression regularExpressionWithPattern:@"@implementation[\\s\\S]+?@end" options:NSRegularExpressionCaseInsensitive error:&err];
+        NSArray<NSTextCheckingResult *> *mContents = [mContentExp matchesInString:fileCntent options:0 range:NSMakeRange(0, fileCntent.length)];
+        if (mContents.count == 0) {
+            // 这个文件不是.m文件 或者 异常
+            return;
+        }
+        // 新结果
+        NSMutableString *newFileContent = [fileCntent mutableCopy];
+        // 倒序
+        [mContents enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSTextCheckingResult * _Nonnull res, NSUInteger idx, BOOL * _Nonnull stop) {
+            // 取出对应部分
+            NSString *matchContent = [fileCntent substringWithRange:res.range];
+            // 在查找混淆
+            NSString *changedString = [self p__confuseTargetString:matchContent regx:regExp isSwift:NO];
+            if (changedString.length > 0) {
+                [newFileContent replaceCharactersInRange:res.range withString:changedString];
+                writeback = YES;
+            }
+        }];
+        if (writeback) {
+            newContentString = newFileContent;
+        }
+    }
+    
     if (writeback) {
         // 写回去
         [newContentString writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
@@ -650,5 +628,65 @@
             NSLog(@"\n\n 艹 回写失败 ： %@", path);
         }
     }
+}
+
+- (NSString *)p__confuseTargetString:(NSString *)targetString regx:(NSRegularExpression *)regExp isSwift:(BOOL)isSwift {
+    // 寻找hard string
+    NSArray<NSTextCheckingResult *> *matchs = [regExp matchesInString:targetString options:0 range:NSMakeRange(0, targetString.length)];
+    if ([matchs count] <= 0) {
+        return nil;
+    }
+    
+    BOOL changed = NO;
+    NSMutableString *newString = [targetString mutableCopy];
+    // 得倒着来 （为了result.range 替换不出错）
+    for (int i = (int)matchs.count - 1; i >= 0; i--) {
+        NSTextCheckingResult *result = matchs[i];
+        if (isSwift == NO) {
+            // OC中的static 或 const 修饰过的字符串, 这里过滤掉, 因为其不能替换为函数获取,  后续可以考虑换为char数组
+            NSRange lineRange = [targetString lineRangeForRange:result.range];
+            NSString *lineString = [targetString substringWithRange:lineRange];
+            if ([lineString containsString:@"static "] || [lineString containsString:@"const "]) {
+                NSLog(@"跳过 OC中的static或const修饰过的字符串: %@",
+                      [lineString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]);
+                continue;
+            }
+        }
+        NSString *matchedString = [targetString substringWithRange:result.range];
+        NSString *hardStringCode = nil;
+        if (isSwift) {
+            hardStringCode = [matchedString substringWithRange:NSMakeRange(1, matchedString.length - 2)];
+        }else{
+            hardStringCode = [matchedString substringWithRange:NSMakeRange(2, matchedString.length - 3)];
+        }
+        if (hardStringCode.length == 0) {
+            // 空串不需混淆
+            continue;
+        }
+        
+        // 混淆编码
+        NSString *encriptedStr = XYZ_encriptHardString(hardStringCode);
+        if (encriptedStr.length == 0) {
+            NSLog(@"注意啦注意啦: 硬编码字符串加密有bug啦啦~");
+            continue;
+        }
+        NSString *new = nil;
+        if (isSwift) {
+            new = [NSString stringWithFormat:@"XYZ_decriptHardString(\"%@\")", encriptedStr];
+        }else {
+            new = [NSString stringWithFormat:@"XYZ_decriptHardString(@\"%@\")", encriptedStr];
+        }
+        
+        if (new.length == 0) {
+            NSLog(@"注意啦注意啦: 创建字符串失败啦~");
+            continue;
+        }
+        // 替换回去
+        [newString replaceCharactersInRange:result.range withString:new];
+        changed = YES;
+        //测试
+        //        NSLog(@"加密验证结果: %d", [XYZ_decriptHardString(encriptedStr) isEqualToString:matchSubContent]);
+    }
+    return changed ? newString : nil;
 }
 @end
