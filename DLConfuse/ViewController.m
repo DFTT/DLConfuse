@@ -91,7 +91,7 @@
     //
     NSButton *addPreBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 260, 200, 50)];
     addPreBtn.bezelStyle = NSBezelStyleRounded;
-    [addPreBtn setTitle:@"代码文件批量增加前缀Beta"];
+    [addPreBtn setTitle:@"修改代码文件前缀"];
     [addPreBtn setTarget:self];
     [addPreBtn setAction:@selector(addPreBtnAction)];
     [self.view addSubview:addPreBtn];
@@ -114,13 +114,14 @@
     if (text == nil) {
         return;
     }
-    
     text = [text stringByAppendingString:@"\n\n"];
-    NSAttributedString *attr = [[NSAttributedString alloc] initWithString:text];
-    
-    
-    [[_messageView textStorage] appendAttributedString:attr];
-    [_messageView scrollRangeToVisible:NSMakeRange([[_messageView string] length], 0)];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAttributedString *attr = [[NSAttributedString alloc] initWithString:text];
+        
+        
+        [[self->_messageView textStorage] appendAttributedString:attr];
+        [self->_messageView scrollRangeToVisible:NSMakeRange([[self->_messageView string] length], 0)];
+    });
 }
 
 #pragma mark - Action
@@ -162,7 +163,9 @@
     }
     if (isDirectiry && rootURL.pathExtension.length != 0) {
         // 过滤 有后缀的目录
-        if (!_xcodeprojPath && [rootURL.pathExtension isEqualToString:@"xcodeproj"]) {
+        if (!_xcodeprojPath &&
+            [rootURL.pathExtension isEqualToString:@"xcodeproj"] &&
+            ![rootURL.absoluteString containsString:@"/Pods/"]) {
             _xcodeprojPath = rootURL.path;
         }
         return;
@@ -298,9 +301,11 @@
         return;
     }
     
-    [self modify];
-    
-    [self p_appendMessage:@"前缀修改完成"];
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        [self modify];
+        
+        [self p_appendMessage:@"前缀修改完成"];
+    });
 }
 
 
@@ -336,8 +341,8 @@
 }
 
 - (void)modify {
-    NSString *oldPre = @"AF";
-    NSString *newPre = @"XM_AF";
+    NSString *oldPre = @"SU";
+    NSString *newPre = @"TP";
     
     // 工程文件_xcodeprojPath/project.pbxproj 内容
     NSString *pbxprojPath = [_xcodeprojPath stringByAppendingPathComponent:@"project.pbxproj"];
@@ -471,7 +476,7 @@
             }
             // 修改工程文件
             if ([self p_reguleChange:pbxprojContentString fromFile:pbxprojPath.lastPathComponent match:path.lastPathComponent to:newName] == NO) {
-                NSLog(@" 艹  pbxprojContentString change faile -----");
+                NSLog(@" 艹  pbxprojContentString change faile ----- %@", path);
             }
         }
     }
@@ -545,8 +550,10 @@
     
     [self p_appendMessage:@"开始混淆HardString..."];
     
-    // 混淆 hard string
-    [self p_filterAndEncodeHardString];
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{    
+        // 混淆 hard string
+        [self p_filterAndEncodeHardString];
+    });
 }
 
 // 加密 hard string <金币,现金,钱,赚,红包,提现,任务>
