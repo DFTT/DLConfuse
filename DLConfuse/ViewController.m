@@ -608,7 +608,7 @@
         
         [fileCntent enumerateLinesUsingBlock:^(NSString * _Nonnull line, BOOL * _Nonnull stop) {
             NSString *trimLine = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-            if ([trimLine hasPrefix:@"?"] || [trimLine hasPrefix:@"case"] || [trimLine hasPrefix:@"@available("]) {
+            if ([trimLine rangeOfString:@"\\("].location != NSNotFound || [trimLine hasPrefix:@"case"] || [trimLine hasPrefix:@"@available("]) {
                 // 使用原始行
                 [newMString appendString:line];
                 [newMString appendString:@"\n"];
