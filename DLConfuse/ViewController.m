@@ -596,11 +596,44 @@
     NSString *newContentString = nil;
     
     if (item.type == FileIsSwift) {
-        NSString *changedString = [self p__confuseTargetString:fileCntent regx:regExp isSwift:YES];
-        if (changedString.length > 0) {
-            writeback = YES;
-            newContentString = changedString;
+        /**
+         有一些奇怪的创景还没想好怎么怎么处理 ,先按行匹配
+         如
+         "aa\(aaa ?? "")"
+         "aa\(aaa ? "aa" : "bb")"
+         */
+        
+        // 先按行处理
+        NSMutableString *newMString = [NSMutableString stringWithCapacity:fileCntent.length];
+        
+        [fileCntent enumerateLinesUsingBlock:^(NSString * _Nonnull line, BOOL * _Nonnull stop) {
+            NSString *trimLine = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if ([trimLine hasPrefix:@"?"] || [trimLine hasPrefix:@"case"] || [trimLine hasPrefix:@"@available("]) {
+                // 使用原始行
+                [newMString appendString:line];
+                [newMString appendString:@"\n"];
+                return;
+            }
+            NSString *newline = [self p__confuseTargetString:line regx:regExp isSwift:YES];
+            if (newline.length > 0) {
+                writeback = YES;
+                [newMString appendString:newline];
+                [newMString appendString:@"\n"];
+                return;
+            }
+            // 使用原始行
+            [newMString appendString:line];
+            [newMString appendString:@"\n"];
+        }];
+        
+        if (writeback) {
+            newContentString = newMString;
         }
+//        NSString *changedString = [self p__confuseTargetString:fileCntent regx:regExp isSwift:YES];
+//        if (changedString.length > 0) {
+//            writeback = YES;
+//            newContentString = changedString;
+//        }
     }else {
         // 为了避免匹配到 static const NSString *xx = @""
         // 这里先匹配出 @implementation ... @end 的内容, 然后在匹配字符串
