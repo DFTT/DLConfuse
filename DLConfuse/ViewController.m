@@ -43,7 +43,6 @@
 }
 @end
 
-
 @implementation ViewController
 
 - (void)viewDidLoad {
@@ -341,8 +340,31 @@
 }
 
 - (void)modify {
-    NSString *oldPre = @"SU";
+    NSString *oldPre = @"T";
     NSString *newPre = @"TP";
+    
+    typedef NSString *_Nullable (^CheckAndBackNewPreFixBlock)(NSString *oldName);
+    CheckAndBackNewPreFixBlock __checkAndBackNewPreFix = ^ NSString * (NSString *oldName) {
+        // 前缀匹配
+        if ([oldName hasPrefix:oldPre]) {
+            return [oldName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+        }
+        // 过滤常见系统前缀
+        if ([oldName hasPrefix:@"NS"] || [oldName hasPrefix:@"UI"] || [oldName hasPrefix:@"CA"] || [oldName hasPrefix:@"AV"]) {
+            return nil;
+        }
+        // 如果仅第二个字符不是大写 说明没有前缀 一般swift类居多 (这里给其加上前缀)
+        if (oldName.length >= 2) {
+            unichar firstChar = [oldName characterAtIndex:0];
+            unichar secondChar = [oldName characterAtIndex:1];
+            if (secondChar >= 'a' && secondChar <= 'z') {
+                NSString *upperFirstChar = [[NSString stringWithCharacters:&firstChar length:1] uppercaseString];
+                
+                return [NSString stringWithFormat:@"%@%@%@", newPre, upperFirstChar, [oldName substringFromIndex:1]];
+            }
+        }
+        return nil;
+    };
     
     // 工程文件_xcodeprojPath/project.pbxproj 内容
     NSString *pbxprojPath = [_xcodeprojPath stringByAppendingPathComponent:@"project.pbxproj"];
@@ -352,86 +374,126 @@
         return;
     }
     
-    // 筛选需要修改文件名的
-    NSMutableDictionary<NSString *, FileItem *> *nomalItemsMap = [NSMutableDictionary dictionaryWithCapacity:200];
+    // 筛选需要修改的 代码文件 (不包含类扩展文件)
+    NSMutableDictionary<NSString *,FileItem *> * needReNameCodeFileItemMap = [NSMutableDictionary dictionaryWithCapacity:200];
     for (FileItem *item in _codeFileArr) {
-        if ((item.type == FileIsHAndM || item.type == FileIsSwift) && [item.fileName componentsSeparatedByString:@"+"].count != 2 && [item.fileName hasPrefix:oldPre]) {
+        if ((item.type == FileIsHAndM || item.type == FileIsSwift) &&
+            [item.fileName componentsSeparatedByString:@"+"].count != 2) {
+            NSString *newName = __checkAndBackNewPreFix(item.fileName);
+            if (newName == nil) {
+                continue;
+            }
             // 非扩展 (后面应该同时考虑 同名的xib 扩展文件)  (名字中1个"+"认为是扩展 后面处理, 没有或2个及以上"+"认为是普通文件 这里处理)
-            item.reFileName = [item.fileName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
-            nomalItemsMap[item.fileName] = item;
+            item.reFileName = newName;
+            needReNameCodeFileItemMap[item.fileName] = item;
+            
+            // 继续寻找 代码文件中有 其它class struct  后面一起改掉
+            NSString *pattern = nil;
+            if (item.type == FileIsHAndM) {
+                pattern = @"@implementation +(\\w+) *(\(.*\)|\n)";
+            }else {
+                pattern = @"(class|struct) +(\\w+)+ *[{:]";
+            }
+            for(NSString *path in item.absFilesPath) {
+                if ([path.pathExtension isEqualToString:@"m"] || [path.pathExtension isEqualToString:@"swift"]) {
+                    NSMutableDictionary *classNameMap = [self p_matchClassNameFromCodeFile:path
+                                                                                regularPat:pattern
+                                                                                     swift:item.type == FileIsSwift];
+                    // 去除和文件同名的
+                    [classNameMap removeObjectForKey:item.fileName];
+                    // 去除前缀不匹配的
+                    NSArray<OtherClassNameItem *> *finalArr = [classNameMap.allValues filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(OtherClassNameItem *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+                        
+                        NSString *newName = __checkAndBackNewPreFix(item.fileName);
+                        if (newName == nil) {
+                            return NO;
+                        }
+                        
+                        evaluatedObject.reClassName = newName;
+                        return YES;
+                    }]];
+                    // 记录
+                    item.otherClassItems = finalArr;
+                    break;
+                }
+            }
         }
     }
     
-    // 需要修改文件名的category
-    NSMutableDictionary<NSString *, FileItem *> *categoryItemsMap = [NSMutableDictionary dictionaryWithCapacity:200];
-    // 寻找需要该名的扩展
+    // 根据上面需要改名的代码文件 这里筛选出其对应的 扩展文件
+    NSMutableDictionary<NSString *, FileItem *> *needReNameCategoryFileItemMap = [NSMutableDictionary dictionaryWithCapacity:200];
     for (FileItem *item in _codeFileArr) {
         NSArray *halfFileNames = [item.fileName componentsSeparatedByString:@"+"];
         if (halfFileNames.count == 2) {
             NSString *pre = halfFileNames.firstObject;
             NSString *suf = halfFileNames.lastObject;
-            
-            FileItem *hitItem = nomalItemsMap[pre];
+            FileItem *hitItem = needReNameCodeFileItemMap[pre];
             if (hitItem) {
+                // 同名扩展
                 // 特殊 不需判断是否同时存在h/m (比如要改 aaa.swift, 这里找到 aaa+xxx.swift, aaa+xxx.h/m 后续都一起改掉)
                 if ([suf hasPrefix:oldPre]) {
                     suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
                 }
-                // 改名
+                // 修改前缀+后缀
                 item.reFileName = [NSString stringWithFormat:@"%@+%@", hitItem.reFileName, suf];
-                categoryItemsMap[item.fileName] = item;
-                continue;
-            }
-            
-            if (item.type == FileIsHAndM || item.type == FileIsSwift) {
-                // 普通扩展 只判断后半截 后续替换时 只替换aaa+bbb.h 及 bbb, aaa不能替换 会错, 因为如果aaa满足改名条件, 则会命中上面的逻辑
-                BOOL hit = NO;
+                needReNameCategoryFileItemMap[item.fileName] = item;
+                
+            }else if (item.type == FileIsHAndM || item.type == FileIsSwift) {
+                // 其它扩展
+                // 只判断后半截 后续替换时 只替换aaa+bbb.h 及 bbb, aaa不能替换 会错, 因为如果aaa满足改名条件, 则会命中上面的逻辑
                 if ([suf hasPrefix:oldPre]) {
                     suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
-                    hit = YES;
-                }
-                if (hit) {
-                    // 改名
+                    // 仅修改后缀
                     item.reFileName = [NSString stringWithFormat:@"%@+%@", pre, suf];
-                    categoryItemsMap[item.fileName] = item;
-                    continue;
+                    needReNameCategoryFileItemMap[item.fileName] = item;
                 }
-            }
-            continue;
-        }
-        if (item.type == FileIsXIB || item.type == FileIsStoryBoard) {
-            FileItem *hitItem = nomalItemsMap[item.fileName];
-            if (hitItem) {
-                // 特殊 (比如要改 aaa.swift, 这里找到 aaa.xib, aaa.storyboard 后续都一起改掉)
-                // 改名
-                item.reFileName = hitItem.reFileName;
-                continue;
             }
         }
     }
     
-    // 开始改文件内容
-    if (categoryItemsMap.count + nomalItemsMap.count == 0) {
+    // 根据上面需要改名的代码文件 这里筛选出其对应的 IB文件
+    NSMutableDictionary<NSString *, FileItem *> *needReNameIBFileItemMap = [NSMutableDictionary dictionaryWithCapacity:200];
+    for (FileItem *item in _IBFileArr) {
+        // ib 文件
+        if (item.type == FileIsXIB || item.type == FileIsStoryBoard) {
+            FileItem *hitItem = needReNameCodeFileItemMap[item.fileName];
+            if (hitItem) {
+                // 特殊 (比如要改 aaa.swift, 这里找到 aaa.xib, aaa.storyboard 后续都一起改掉)
+                // 改名成和代码文件同名
+                item.reFileName = hitItem.reFileName;
+                needReNameIBFileItemMap[item.fileName] = item;
+            }
+            continue;
+        }
+    }
+    
+    // 开始改文件
+    NSInteger needRenameFileCount = needReNameCategoryFileItemMap.count + needReNameCodeFileItemMap.count + needReNameIBFileItemMap.count;
+    if (needRenameFileCount == 0) {
         [self p_appendMessage:[NSString stringWithFormat:@"---没有发现需要修改前缀的文件"]];
         NSLog(@"\n\n 完成拉~~~~~~~~~\n");
         return;
     }
-    [self p_appendMessage:[NSString stringWithFormat:@"---有 %d 组需要修改前缀的代码文件", (int)(categoryItemsMap.count + nomalItemsMap.count)]];
+    [self p_appendMessage:[NSString stringWithFormat:@"---有 %d 组需要修改前缀的代码文件", (int)(needRenameFileCount)]];
     
-    // 这样遍历修改能减少文件io
+    // 1. 先改文件内容 (这样遍历修改能减少文件I/O)
     NSMutableArray *allFiles = [_codeFileArr mutableCopy];
-    [allFiles addObjectsFromArray:_IBFileArr]; // ib文件也要修改
+    // 加上IB文件
+    [allFiles addObjectsFromArray:_IBFileArr];
     [allFiles enumerateObjectsUsingBlock:^(FileItem * _Nonnull codeFile, NSUInteger idx, BOOL * _Nonnull stop) {
         for (NSString *path in codeFile.absFilesPath) {
+            // 对遍历的文件内容进行修改:
             NSError *err = nil;
             NSMutableString *filecontent = [NSMutableString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
             if (filecontent.length == 0 || err) {
                 NSLog(@" 艹 文件读取失败, 请检查重试 %@", err);
                 return;
             }
+            // 当前文件内容是否 被修改的标志位
             __block BOOL didChange = NO;
-            // 一定先改扩展的
-            [categoryItemsMap.allValues enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            
+            // 一定先改扩展的文件的 (因为其名称范围 大于 代码文件名称)
+            [needReNameCategoryFileItemMap.allValues enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
                 // 记录是否修改过 用 "|="
                 // 改全名
                 didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
@@ -444,10 +506,17 @@
                     NSLog(@" 艹 出错拉, 请检查重试 %@", err);
                 }
             }];
-            // 在改普通的
-            [nomalItemsMap.allValues enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            
+            // 再改代码文件的
+            [needReNameCodeFileItemMap.allValues enumerateObjectsUsingBlock:^(FileItem *obj, NSUInteger idx, BOOL * _Nonnull stop) {
                 // 记录是否修改过 用 "|="
                 didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
+                // 修改当前文件中的其它类
+                [obj.otherClassItems enumerateObjectsUsingBlock:^(OtherClassNameItem * _Nonnull otherClsItem, NSUInteger idx, BOOL * _Nonnull stop) {
+                    if (otherClsItem.reClassName.length > 0) {
+                        didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:otherClsItem.className to:otherClsItem.reClassName];
+                    }
+                }];
             }];
             
             if (didChange) {
@@ -461,9 +530,13 @@
         }
     }];
     
-    // 开始改文件名
+    // 2. 在改开始改文件名
     NSFileManager *film = [NSFileManager defaultManager];
-    for (FileItem *item in _codeFileArr) {
+    NSMutableArray *allArr = [NSMutableArray arrayWithCapacity:needRenameFileCount];
+    [allArr addObjectsFromArray:needReNameCodeFileItemMap.allValues];
+    [allArr addObjectsFromArray:needReNameCategoryFileItemMap.allValues];
+    [allArr addObjectsFromArray:needReNameIBFileItemMap.allValues];
+    for (FileItem *item in allArr) {
         if (item.reFileName.length <= 0) {
             continue;
         }
@@ -480,13 +553,50 @@
             }
         }
     }
-    // 回写pbxproj
+    // 2.2 回写工程文件pbxproj
     NSError *err = nil;
     if (![pbxprojContentString writeToFile:pbxprojPath atomically:YES encoding:NSUTF8StringEncoding error:&err]) {
         NSLog(@" 艹  回写pbxproj error -----%@", err);
     }
     
     NSLog(@"\n\n 完成拉~~~~~~~~~\n");
+}
+- (nullable NSMutableDictionary<NSString *, OtherClassNameItem *> *)p_matchClassNameFromCodeFile:(NSString *)path regularPat:(NSString *)reguPat swift:(BOOL)isSwift {
+    NSError *err = nil;
+    NSRegularExpression *regExp = [NSRegularExpression regularExpressionWithPattern:reguPat options:0 error:&err];
+    if (!regExp || err) {
+        return nil;
+    }
+    NSString *fileContent = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    if (fileContent.length == 0) {
+        return nil;
+    }
+    
+    NSArray<NSTextCheckingResult *> *resArr = [regExp matchesInString:fileContent options:0 range:NSMakeRange(0, fileContent.length)];
+    if (resArr.count == 0) {
+        return nil;
+    }
+    NSMutableDictionary *classMap = [NSMutableDictionary dictionaryWithCapacity:resArr.count];
+    for (NSTextCheckingResult *res in resArr) {
+        if (isSwift) {
+            if(res.numberOfRanges == 3) {
+                NSString *class = [fileContent substringWithRange:[res rangeAtIndex:2]];
+                class = [class stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+                [classMap setObject:[OtherClassNameItem itemWithClassName:class] forKey:class];
+            }else {
+                NSLog(@"请检查~~~~1");
+            }
+        }else {
+            if(res.numberOfRanges == 3 || res.numberOfRanges == 4) {
+                NSString *class = [fileContent substringWithRange:[res rangeAtIndex:1]];
+                class = [class stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+                [classMap setObject:[OtherClassNameItem itemWithClassName:class] forKey:class];
+            }else {
+                NSLog(@"请检查~~~~2");
+            }
+        }
+    }
+    return classMap;
 }
 #pragma mark - 三方库加前缀
 // 这个方法 危险, 仅是为了给三方库加前缀用的 (文件名修改 请使用上面的方法, 单独调用此方法; 文件夹路径仅设置需要修改的库源码文件夹即可)
@@ -550,7 +660,7 @@
     
     [self p_appendMessage:@"开始混淆HardString..."];
     
-    dispatch_async(dispatch_get_global_queue(0, 0), ^{    
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
         // 混淆 hard string
         [self p_filterAndEncodeHardString];
     });
@@ -629,11 +739,11 @@
         if (writeback) {
             newContentString = newMString;
         }
-//        NSString *changedString = [self p__confuseTargetString:fileCntent regx:regExp isSwift:YES];
-//        if (changedString.length > 0) {
-//            writeback = YES;
-//            newContentString = changedString;
-//        }
+        //        NSString *changedString = [self p__confuseTargetString:fileCntent regx:regExp isSwift:YES];
+        //        if (changedString.length > 0) {
+        //            writeback = YES;
+        //            newContentString = changedString;
+        //        }
     }else {
         // 为了避免匹配到 static const NSString *xx = @""
         // 这里先匹配出 @implementation ... @end 的内容, 然后在匹配字符串

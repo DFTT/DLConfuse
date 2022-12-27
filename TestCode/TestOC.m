@@ -20,3 +20,8 @@
     NSString *nn1 = @"你好吗\"先生2\"";
 }
 @end
+
+@interface TestOC (T_Category)
+@end
+@implementation TestOC (T_Category)
+@end

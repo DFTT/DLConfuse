@@ -8,6 +8,14 @@
 
 #import "FileItem.h"
 
+@implementation OtherClassNameItem
++ (instancetype)itemWithClassName:(NSString *)clsname {
+    OtherClassNameItem *item = [[OtherClassNameItem alloc] init];
+    item.className = clsname;
+    return item;
+}
+@end
+
 @implementation FileItem
 //
 - (NSString *)description {

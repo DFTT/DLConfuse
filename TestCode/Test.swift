@@ -10,7 +10,11 @@ import Foundation
 
 class Test {}
 
+ class Test3 {}
+
 class Test2: NSObject {
+    class Test4 {}
+    
     func aaa() {
         let a = "普通字符串"
         let b = "包含一个\"转义字符"
