@@ -340,15 +340,18 @@
 }
 
 - (void)modify {
-    NSString *oldPre = @"T";
+    NSArray *oldPreArr = @[@"SU", @"TK", @"TS"];
     NSString *newPre = @"TP";
     
     typedef NSString *_Nullable (^CheckAndBackNewPreFixBlock)(NSString *oldName);
     CheckAndBackNewPreFixBlock __checkAndBackNewPreFix = ^ NSString * (NSString *oldName) {
         // 前缀匹配
-        if ([oldName hasPrefix:oldPre]) {
-            return [oldName stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+        for (NSString *oPre in oldPreArr) {
+            if ([oldName hasPrefix:oPre]) {
+                return [oldName stringByReplacingCharactersInRange:NSMakeRange(0, oPre.length) withString:newPre];
+            }
         }
+        
         // 过滤常见系统前缀
         if ([oldName hasPrefix:@"NS"] || [oldName hasPrefix:@"UI"] || [oldName hasPrefix:@"CA"] || [oldName hasPrefix:@"AV"]) {
             return nil;
@@ -431,9 +434,7 @@
             if (hitItem) {
                 // 同名扩展
                 // 特殊 不需判断是否同时存在h/m (比如要改 aaa.swift, 这里找到 aaa+xxx.swift, aaa+xxx.h/m 后续都一起改掉)
-                if ([suf hasPrefix:oldPre]) {
-                    suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
-                }
+                suf = __checkAndBackNewPreFix(suf) ? : suf;
                 // 修改前缀+后缀
                 item.reFileName = [NSString stringWithFormat:@"%@+%@", hitItem.reFileName, suf];
                 needReNameCategoryFileItemMap[item.fileName] = item;
@@ -441,10 +442,10 @@
             }else if (item.type == FileIsHAndM || item.type == FileIsSwift) {
                 // 其它扩展
                 // 只判断后半截 后续替换时 只替换aaa+bbb.h 及 bbb, aaa不能替换 会错, 因为如果aaa满足改名条件, 则会命中上面的逻辑
-                if ([suf hasPrefix:oldPre]) {
-                    suf = [suf stringByReplacingCharactersInRange:NSMakeRange(0, oldPre.length) withString:newPre];
+                NSString *newSuf = __checkAndBackNewPreFix(suf);
+                if (newSuf.length > 0) {
                     // 仅修改后缀
-                    item.reFileName = [NSString stringWithFormat:@"%@+%@", pre, suf];
+                    item.reFileName = [NSString stringWithFormat:@"%@+%@", pre, newSuf];
                     needReNameCategoryFileItemMap[item.fileName] = item;
                 }
             }
