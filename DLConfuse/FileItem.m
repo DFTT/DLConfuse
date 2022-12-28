@@ -23,7 +23,11 @@
 }
 
 
+
 #pragma mark - M
+- (BOOL)isOCCodeFile {
+    return _type == FileIsOnlyH || _type == FileIsOnlyM || _type == FileIsHAndM;
+}
 - (NSArray<NSString *> *)absFilesPath {
     if (_type == FileIsSwift) {
         return @[[_parentDirectoryABSPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.swift", _fileName]]];

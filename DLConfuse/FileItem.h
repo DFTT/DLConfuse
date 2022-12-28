@@ -12,10 +12,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 typedef NS_ENUM(NSInteger, FileType) {
     FileIsSwift,     // swift
+    
     FileIsOnlyH,     // H
     FileIsOnlyM,     // M
-    FileIsPCH,       // PCH
     FileIsHAndM,     // H & M
+    
+    FileIsPCH,       // PCH
+    
     FileIsXIB,       // xib
     FileIsStoryBoard,     // storyboard
 };
@@ -36,6 +39,7 @@ typedef NS_ENUM(NSInteger, FileType) {
 
 - (NSArray<NSString *> *)absFilesPath;
 
+- (BOOL)isOCCodeFile;
 
 // 新文件名 (这个不为nil 就会修改其文件名)
 @property (nonatomic, copy, nullable) NSString *reFileName;

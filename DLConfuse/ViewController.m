@@ -318,6 +318,7 @@
     NSString *temp = [old stringByReplacingOccurrencesOfString:@"+" withString:@"\\+"];
     temp = [temp stringByReplacingOccurrencesOfString:@"." withString:@"\\."];
     NSString *pattern = [NSString stringWithFormat:@"\\b%@\\b", temp];
+    
     NSError *err = nil;
     NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:&err];
     if (!regex || err) {
@@ -353,7 +354,8 @@
         }
         
         // 过滤常见系统前缀
-        if ([oldName hasPrefix:@"NS"] || [oldName hasPrefix:@"UI"] || [oldName hasPrefix:@"CA"] || [oldName hasPrefix:@"AV"]) {
+        if ([oldName hasPrefix:@"NS"] || [oldName hasPrefix:@"UI"] || [oldName hasPrefix:@"CA"] || [oldName hasPrefix:@"AV"] ||
+            [oldName isEqualToString:@"Appdelegate"]) {
             return nil;
         }
         // 如果仅第二个字符不是大写 说明没有前缀 一般swift类居多 (这里给其加上前缀)
@@ -498,13 +500,15 @@
                 // 记录是否修改过 用 "|="
                 // 改全名
                 didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
-                // 改后半截
-                NSArray *oldStrings = [obj.fileName componentsSeparatedByString:@"+"];
-                NSArray *newStrings = [obj.reFileName componentsSeparatedByString:@"+"];
-                if (oldStrings.count == 2 && oldStrings.count == newStrings.count) {
-                    didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:oldStrings.lastObject to:newStrings.lastObject];
-                }else {
-                    NSLog(@" 艹 出错拉, 请检查重试 %@", err);
+                // 改后半截 (只要有OC代码文件需要)
+                if ([codeFile isOCCodeFile]) {
+                    NSArray *oldStrings = [obj.fileName componentsSeparatedByString:@"+"];
+                    NSArray *newStrings = [obj.reFileName componentsSeparatedByString:@"+"];
+                    if (oldStrings.count == 2 && oldStrings.count == newStrings.count) {
+                        didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:oldStrings.lastObject to:newStrings.lastObject];
+                    }else {
+                        NSLog(@" 艹 扩展后半截出错拉, 请检查重试 %@", err);
+                    }
                 }
             }];
             
@@ -518,6 +522,12 @@
                         didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:otherClsItem.className to:otherClsItem.reClassName];
                     }
                 }];
+            }];
+            
+            // 在改Ib文件的
+            [needReNameIBFileItemMap.allValues enumerateObjectsUsingBlock:^(FileItem * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                // 记录是否修改过 用 "|="
+                didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
             }];
             
             if (didChange) {
@@ -534,8 +544,9 @@
     // 2. 在改开始改文件名
     NSFileManager *film = [NSFileManager defaultManager];
     NSMutableArray *allArr = [NSMutableArray arrayWithCapacity:needRenameFileCount];
-    [allArr addObjectsFromArray:needReNameCodeFileItemMap.allValues];
+    // 这里添加也是有顺序的 先扩展 再代码 再ib
     [allArr addObjectsFromArray:needReNameCategoryFileItemMap.allValues];
+    [allArr addObjectsFromArray:needReNameCodeFileItemMap.allValues];
     [allArr addObjectsFromArray:needReNameIBFileItemMap.allValues];
     for (FileItem *item in allArr) {
         if (item.reFileName.length <= 0) {
