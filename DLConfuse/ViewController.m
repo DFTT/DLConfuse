@@ -95,6 +95,14 @@
     [addPreBtn setAction:@selector(addPreBtnAction)];
     [self.view addSubview:addPreBtn];
     
+    //
+    NSButton *changeDirectoryNameBtn  = [[NSButton alloc] initWithFrame:CGRectMake(10, 310, 200, 50)];
+    changeDirectoryNameBtn.bezelStyle = NSBezelStyleRounded;
+    [changeDirectoryNameBtn setTitle:@"修改文件夹名(深度遍历)"];
+    [changeDirectoryNameBtn setTarget:self];
+    [changeDirectoryNameBtn setAction:@selector(changeDirectoryNameBtnAciton)];
+    [self.view addSubview:changeDirectoryNameBtn];
+    
     
     //
     NSScrollView *scrolleView = [[NSScrollView alloc] initWithFrame:CGRectMake(220, 10, 800, self.view.bounds.size.height - 10)];
@@ -284,6 +292,19 @@
         [self p__findVisiableFilesInURL:subDirURL];
     }
 }
+
+#pragma mark - 修改文件夹名(深度遍历)
+- (void)changeDirectoryNameBtnAciton {
+    if (!_rootDirectoryPathURL) {
+        [self p_appendMessage:@"---请先指定一个目录"];
+        return;
+    }
+    //
+    [self __reset];
+    [self p_appendMessage:@"---开始深度遍历指定目录, 并修改文件件名称"];
+//        ..
+}
+
 #pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
     
@@ -349,7 +370,7 @@
 }
 
 - (void)modify {
-    NSArray *oldPreArr = @[@"SU", @"TK", @"TS"];
+    NSArray *oldPreArr = @[@"TP", @"PW", @"SU"];
     NSString *newPre = @"TP";
     
     typedef NSString *_Nullable (^CheckAndBackNewPreFixBlock)(NSString *oldName);
