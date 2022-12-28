@@ -405,7 +405,7 @@
             if (item.type == FileIsHAndM) {
                 pattern = @"@implementation +(\\w+) *(\\(.*\\)|\n)";
             }else {
-                pattern = @"(class|struct) +(\\w+)+ *[{:]";
+                pattern = @"(class|struct|protocol|enum) +(\\w+)+ *[{:]";
             }
             for(NSString *path in item.absFilesPath) {
                 if ([path.pathExtension isEqualToString:@"m"] || [path.pathExtension isEqualToString:@"swift"]) {
