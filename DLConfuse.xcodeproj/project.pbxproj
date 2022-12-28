@@ -17,6 +17,7 @@
 		5B4A6A2D2248D4D900459F2C /* FileItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4A6A2C2248D4D900459F2C /* FileItem.m */; };
 		5BBD46AC2816BFAA0013DEB0 /* TestOC.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BBD46AB2816BFAA0013DEB0 /* TestOC.m */; };
 		5BC0C71626B8491C008F310F /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC0C71526B8491C008F310F /* Test.swift */; };
+		5BE0757B295BFAD8002F2EB0 /* TestOC+CCC.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BE0757A295BFAD8002F2EB0 /* TestOC+CCC.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,8 @@
 		5BBD46AB2816BFAA0013DEB0 /* TestOC.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestOC.m; sourceTree = "<group>"; };
 		5BC0C71226B847D9008F310F /* DLConfuse-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "DLConfuse-Bridging-Header.h"; sourceTree = "<group>"; };
 		5BC0C71526B8491C008F310F /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
+		5BE07579295BFAD8002F2EB0 /* TestOC+CCC.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TestOC+CCC.h"; sourceTree = "<group>"; };
+		5BE0757A295BFAD8002F2EB0 /* TestOC+CCC.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TestOC+CCC.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -160,6 +163,8 @@
 				5BC0C71526B8491C008F310F /* Test.swift */,
 				5BBD46AA2816BFAA0013DEB0 /* TestOC.h */,
 				5BBD46AB2816BFAA0013DEB0 /* TestOC.m */,
+				5BE07579295BFAD8002F2EB0 /* TestOC+CCC.h */,
+				5BE0757A295BFAD8002F2EB0 /* TestOC+CCC.m */,
 			);
 			path = TestCode;
 			sourceTree = "<group>";
@@ -305,6 +310,7 @@
 				5BC0C71626B8491C008F310F /* Test.swift in Sources */,
 				5B4A69F92244CBD100459F2C /* AppDelegate.m in Sources */,
 				5BBD46AC2816BFAA0013DEB0 /* TestOC.m in Sources */,
+				5BE0757B295BFAD8002F2EB0 /* TestOC+CCC.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

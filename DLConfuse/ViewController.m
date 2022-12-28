@@ -310,14 +310,22 @@
 
 // fromFile 这个参数是为了debugLog
 - (BOOL)p_reguleChange:(NSMutableString *)mContent fromFile:(NSString *)file match:(NSString *)old to:(NSString *)new {
+    return [self p_reguleChange:mContent fromFile:file match:old regularMatch:nil to:new];
+}
+- (BOOL)p_reguleChange:(NSMutableString *)mContent fromFile:(NSString *)file match:(NSString *)old regularMatch:(NSString *)regularOld to:(NSString *)new {
     if (new.length <= 0 ) {
         NSLog(@" 艹 这里不会走的");
         return NO;
     }
-    // 构造正则表达式, 处理特殊字符
-    NSString *temp = [old stringByReplacingOccurrencesOfString:@"+" withString:@"\\+"];
-    temp = [temp stringByReplacingOccurrencesOfString:@"." withString:@"\\."];
-    NSString *pattern = [NSString stringWithFormat:@"\\b%@\\b", temp];
+    NSString *pattern = nil;
+    if (regularOld.length > 0) {
+        pattern = regularOld;
+    }else {
+        // 构造正则表达式, 处理特殊字符
+        NSString *temp = [old stringByReplacingOccurrencesOfString:@"+" withString:@"\\+"];
+        temp = [temp stringByReplacingOccurrencesOfString:@"." withString:@"\\."];
+        pattern = [NSString stringWithFormat:@"\\b%@\\b", temp];
+    }
     
     NSError *err = nil;
     NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:&err];
@@ -395,7 +403,7 @@
             // 继续寻找 代码文件中有 其它class struct  后面一起改掉
             NSString *pattern = nil;
             if (item.type == FileIsHAndM) {
-                pattern = @"@implementation +(\\w+) *(\(.*\)|\n)";
+                pattern = @"@implementation +(\\w+) *(\\(.*\\)|\n)";
             }else {
                 pattern = @"(class|struct) +(\\w+)+ *[{:]";
             }
@@ -409,7 +417,7 @@
                     // 去除前缀不匹配的
                     NSArray<OtherClassNameItem *> *finalArr = [classNameMap.allValues filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(OtherClassNameItem *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
                         
-                        NSString *newName = __checkAndBackNewPreFix(item.fileName);
+                        NSString *newName = __checkAndBackNewPreFix(evaluatedObject.className);
                         if (newName == nil) {
                             return NO;
                         }
@@ -501,11 +509,13 @@
                 // 改全名
                 didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:obj.fileName to:obj.reFileName];
                 // 改后半截 (只要有OC代码文件需要)
-                if ([codeFile isOCCodeFile]) {
+                if ([obj isOCCodeFile] && [codeFile isOCCodeFile]) {
                     NSArray *oldStrings = [obj.fileName componentsSeparatedByString:@"+"];
                     NSArray *newStrings = [obj.reFileName componentsSeparatedByString:@"+"];
                     if (oldStrings.count == 2 && oldStrings.count == newStrings.count) {
-                        didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:oldStrings.lastObject to:newStrings.lastObject];
+                        NSString *regu_match = [NSString stringWithFormat:@"\\( *%@ *\\)",oldStrings.lastObject];
+                        NSString *new = [NSString stringWithFormat:@"(%@)",newStrings.lastObject];
+                        didChange |= [self p_reguleChange:filecontent fromFile:path.lastPathComponent match:regu_match regularMatch:regu_match to:new];
                     }else {
                         NSLog(@" 艹 扩展后半截出错拉, 请检查重试 %@", err);
                     }
@@ -599,7 +609,7 @@
                 NSLog(@"请检查~~~~1");
             }
         }else {
-            if(res.numberOfRanges == 3 || res.numberOfRanges == 4) {
+            if(res.numberOfRanges == 3) {
                 NSString *class = [fileContent substringWithRange:[res rangeAtIndex:1]];
                 class = [class stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
                 [classMap setObject:[OtherClassNameItem itemWithClassName:class] forKey:class];

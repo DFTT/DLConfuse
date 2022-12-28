@@ -21,7 +21,17 @@
 }
 @end
 
-@interface TestOC (T_Category)
+@interface TestOC2: NSObject
 @end
-@implementation TestOC (T_Category)
+@implementation TestOC2
+@end
+
+@interface TestOC2 (C222)
+@end
+@implementation TestOC2 (C222)
+@end
+
+@interface TestOC2(C333)
+@end
+@implementation TestOC2(C333)
 @end
