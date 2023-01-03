@@ -368,7 +368,11 @@
         NSLog(@" 艹 contents error = %@", err);
         return;
     }
-    
+    if (contentURLs.count == 0) {
+        // 空目录 直接删除
+        [fileM removeItemAtURL:newURL error:nil];
+        NSLog(@"删除空目录: %@", newURL);
+    }
     for (NSURL *subURL in contentURLs) {
         err = nil;
         if ([[[subURL resourceValuesForKeys:@[NSURLIsDirectoryKey] error:&err] objectForKey:NSURLIsDirectoryKey] boolValue] == YES && nil == err) {
