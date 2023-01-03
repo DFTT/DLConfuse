@@ -301,9 +301,82 @@
     }
     //
     [self __reset];
-    [self p_appendMessage:@"---开始深度遍历指定目录, 并修改文件件名称"];
+    [self p_appendMessage:@"---开始深度遍历指定目录, 并修改文件夹名称"];
 //        ..
+    [self p__changeAllDirectoryInURL:_rootDirectoryPathURL];
 }
+- (void)p__changeAllDirectoryInURL:(NSURL *)rootURL {
+    if (!rootURL) {
+        return;
+    }
+    NSFileManager *fileM = [NSFileManager defaultManager];
+    
+    BOOL isDirectiry = NO;
+    if (NO == [fileM fileExistsAtPath:rootURL.path isDirectory:&isDirectiry]) {
+        // 过滤 非目录
+        return;
+    }
+    if ([fileM isWritableFileAtPath:rootURL.path] == NO) {
+        // 过滤 无写权限的的
+        return;
+    }
+    if (isDirectiry && rootURL.pathExtension.length != 0) {
+        // 过滤 有后缀的目录
+        if (!_xcodeprojPath &&
+            [rootURL.pathExtension isEqualToString:@"xcodeproj"] &&
+            ![rootURL.absoluteString containsString:@"/Pods/"]) {
+            _xcodeprojPath = rootURL.path;
+        }
+        return;
+    }
+    if (isDirectiry && [rootURL.lastPathComponent hasPrefix:@"."]) {
+        // 过滤 .xx  这种命名的文件夹
+        return;
+    }
+    
+    if ([_filterFileNames containsObject:rootURL.lastPathComponent]) {
+        // 命中过滤
+        NSLog(@" 命中过滤文件夹 %@", rootURL.lastPathComponent);
+        return;
+    }
+    
+    NSError *err = nil;
+    
+    // 修改
+    NSString *dirName = rootURL.lastPathComponent;
+    NSURL *supperDirURL = rootURL.URLByDeletingLastPathComponent;
+    NSString *newDirName = [[dirName substringFromIndex:dirName.length - 2] stringByAppendingString:[dirName substringToIndex:dirName.length - 2]];
+    
+    NSURL *newURL = [supperDirURL URLByAppendingPathComponent:newDirName];
+    if ([rootURL isEqualTo:_rootDirectoryPathURL]) {
+        // 根目录不修改 因为可能是git根目录 修改后soucetree会识别不大 这个手动处理
+        newURL = rootURL;
+    }else if ([fileM moveItemAtURL:rootURL toURL:newURL error:&err] == NO || err) {
+        // 修改失败, 继续修改子目录
+        newURL = rootURL;
+        NSLog(@"目录修改失败了: %@", err);
+    }
+    
+    // 处理子目录
+    NSArray<NSURL *> *contentURLs = [fileM contentsOfDirectoryAtURL:newURL
+                                         includingPropertiesForKeys:@[NSURLIsDirectoryKey]
+                                                            options:NSDirectoryEnumerationSkipsHiddenFiles   // 忽略隐藏文件/夹
+                                                              error:&err];
+    if (err) {
+        NSLog(@" 艹 contents error = %@", err);
+        return;
+    }
+    
+    for (NSURL *subURL in contentURLs) {
+        err = nil;
+        if ([[[subURL resourceValuesForKeys:@[NSURLIsDirectoryKey] error:&err] objectForKey:NSURLIsDirectoryKey] boolValue] == YES && nil == err) {
+            
+            // 子目录 后面继续递归
+            [self p__changeAllDirectoryInURL:subURL];
+        }
+    }
+}
+
 
 #pragma mark - 批量修改代码文件前缀
 - (void)addPreBtnAction {
