@@ -304,6 +304,8 @@
     [self p_appendMessage:@"---开始深度遍历指定目录, 并修改文件夹名称"];
 //        ..
     [self p__changeAllDirectoryInURL:_rootDirectoryPathURL];
+    
+    [self p_appendMessage:@"---完成拉👏🏻"];
 }
 - (void)p__changeAllDirectoryInURL:(NSURL *)rootURL {
     if (!rootURL) {
@@ -446,28 +448,47 @@
     NSArray *oldPreArr = @[@"TP", @"PW", @"SU"];
     NSString *newPre = @"TP";
     
+    // 后缀修改, 仅是为了增加变化, 不喜欢也可以不要
+    NSDictionary<NSString *, NSString *> *subFixMap = @{@"ViewController" : @"VC",
+                                                        @"Ctl" : @"VC",
+                                                        @"Ctrl" : @"VC",
+    };
+    
     typedef NSString *_Nullable (^CheckAndBackNewPreFixBlock)(NSString *oldName);
     CheckAndBackNewPreFixBlock __checkAndBackNewPreFix = ^ NSString * (NSString *oldName) {
-        // 前缀匹配
-        for (NSString *oPre in oldPreArr) {
-            if ([oldName hasPrefix:oPre]) {
-                return [oldName stringByReplacingCharactersInRange:NSMakeRange(0, oPre.length) withString:newPre];
-            }
-        }
-        
         // 过滤常见系统前缀
         if ([oldName hasPrefix:@"NS"] || [oldName hasPrefix:@"UI"] || [oldName hasPrefix:@"CA"] || [oldName hasPrefix:@"AV"] ||
             [oldName isEqualToString:@"Appdelegate"]) {
             return nil;
         }
+        
+        
+        // 后缀
+        __block NSString *newSufixName = nil;
+        [subFixMap enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, NSString * _Nonnull obj, BOOL * _Nonnull stop) {
+            if ([oldName hasSuffix:key]) {
+                newSufixName = [oldName stringByReplacingCharactersInRange:NSMakeRange(newSufixName.length - key.length, key.length) withString:obj];
+                *stop = YES;
+            }
+        }];
+        
+        // 前缀匹配
+        NSString *newName = newSufixName ? newSufixName : oldName;
+        for (NSString *oPre in oldPreArr) {
+            if ([newName hasPrefix:oPre]) {
+                return [newName stringByReplacingCharactersInRange:NSMakeRange(0, oPre.length) withString:newPre];
+            }
+        }
+        
         // 如果仅第二个字符不是大写 说明没有前缀 一般swift类居多 (这里给其加上前缀)
-        if (oldName.length >= 2) {
-            unichar firstChar = [oldName characterAtIndex:0];
-            unichar secondChar = [oldName characterAtIndex:1];
+        newName = newSufixName ? newSufixName : oldName;
+        if (newName.length >= 2) {
+            unichar firstChar = [newName characterAtIndex:0];
+            unichar secondChar = [newName characterAtIndex:1];
             if (secondChar >= 'a' && secondChar <= 'z') {
                 NSString *upperFirstChar = [[NSString stringWithCharacters:&firstChar length:1] uppercaseString];
                 
-                return [NSString stringWithFormat:@"%@%@%@", newPre, upperFirstChar, [oldName substringFromIndex:1]];
+                return [NSString stringWithFormat:@"%@%@%@", newPre, upperFirstChar, [newName substringFromIndex:1]];
             }
         }
         return nil;
